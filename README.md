@@ -8,7 +8,8 @@ This is an n8n community node for integrating with WhatsApp Multi-Session API. I
 - 💬 **Message Sending**: Send text, images, documents, and location messages
 - 👥 **Contact Management**: List contacts and check if numbers are on WhatsApp
 - ⌨️ **Typing Indicators**: Show/hide typing status for better user experience
-- 🔗 **Webhook Support**: Receive real-time message notifications  
+- 🔗 **Webhook Support**: Receive real-time message notifications
+- 📨 **Webhook Trigger**: Dedicated trigger node for receiving incoming WhatsApp messages
 - 🔐 **API Key Authentication**: Secure authentication with API keys
 
 ## Installation
@@ -155,6 +156,42 @@ docker-compose up -d
 }
 ```
 
+### 6. Receive WhatsApp Messages (Webhook Trigger)
+
+```json
+{
+  "nodes": [
+    {
+      "name": "WhatsApp Message Received",
+      "type": "n8n-nodes-whatsapp-multi-session.whatsAppMultiSessionTrigger",
+      "parameters": {
+        "sessionIdFilter": "my_session",
+        "messageTypeFilter": "text",
+        "includeSystemMessages": false
+      }
+    },
+    {
+      "name": "Process Message",
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "// Access the structured webhook data\nconst message = $json.message;\nconst senderPhone = $json.from_phone;\nconst senderName = $json.from_name;\n\nreturn { message, senderPhone, senderName };"
+      }
+    },
+    {
+      "name": "Send Auto Reply",
+      "type": "n8n-nodes-whatsapp-multi-session.whatsAppMultiSession",
+      "parameters": {
+        "resource": "message",
+        "operation": "sendText",
+        "sessionId": "my_session", 
+        "phoneNumber": "={{$json.from_phone}}",
+        "messageText": "Thanks for your message: {{$json.message}}"
+      }
+    }
+  ]
+}
+```
+
 ## Common Workflow Patterns
 
 ### 1. Customer Support Bot
@@ -207,6 +244,12 @@ docker-compose up -d
 - **Set URL**: Configure webhook URL for receiving messages
 - **Get URL**: Retrieve current webhook configuration
 - **Remove**: Delete webhook configuration
+
+### Webhook Trigger Node
+- **WhatsApp Multi-Session Trigger**: Dedicated trigger node for receiving incoming messages
+- **Message Filtering**: Filter by session ID, message type, and system messages
+- **Structured Data**: Clean, structured webhook data with phone number extraction
+- **Real-time Processing**: Immediate processing of incoming WhatsApp messages
 
 ## Error Handling
 
