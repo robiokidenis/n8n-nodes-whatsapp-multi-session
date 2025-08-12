@@ -36,7 +36,7 @@ export class WhatsAppMultiSessionApi implements ICredentialType {
 		type: 'generic',
 		properties: {
 			headers: {
-				'X-API-Key': '={{$credentials.apiKey}}',
+				'Authorization': '=Bearer {{$credentials.apiKey}}',
 			},
 		},
 	};
@@ -47,7 +47,7 @@ export class WhatsAppMultiSessionApi implements ICredentialType {
 			url: '/api/health',
 			method: 'GET',
 			headers: {
-				'X-API-Key': '={{$credentials.apiKey}}',
+				'Authorization': '=Bearer {{$credentials.apiKey}}',
 			},
 		},
 	};

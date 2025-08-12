@@ -26,10 +26,19 @@ export class WhatsAppMultiSessionTrigger implements INodeType {
 				name: 'default',
 				httpMethod: 'POST',
 				responseMode: 'onReceived',
-				path: 'webhook',
+				path: '={{$parameter["webhookPath"] || "webhook"}}',
 			},
 		],
 		properties: [
+			{
+				displayName: 'Webhook Path',
+				name: 'webhookPath',
+				type: 'string',
+				default: 'whatsapp-webhook',
+				required: true,
+				placeholder: 'whatsapp-webhook',
+				description: 'Custom webhook path (will be: /webhook/your-path)',
+			},
 			{
 				displayName: 'Session ID Filter',
 				name: 'sessionIdFilter',

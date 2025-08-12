@@ -32,7 +32,7 @@ class WhatsAppMultiSessionApi {
             type: 'generic',
             properties: {
                 headers: {
-                    'X-API-Key': '={{$credentials.apiKey}}',
+                    'Authorization': '=Bearer {{$credentials.apiKey}}',
                 },
             },
         };
@@ -42,7 +42,7 @@ class WhatsAppMultiSessionApi {
                 url: '/api/health',
                 method: 'GET',
                 headers: {
-                    'X-API-Key': '={{$credentials.apiKey}}',
+                    'Authorization': '=Bearer {{$credentials.apiKey}}',
                 },
             },
         };

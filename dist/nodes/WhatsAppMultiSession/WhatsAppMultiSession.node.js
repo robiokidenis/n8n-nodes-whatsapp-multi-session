@@ -449,7 +449,7 @@ class WhatsAppMultiSession {
         const baseUrl = credentials.serverUrl;
         // Use API key for authentication
         const authHeaders = {
-            'X-API-Key': credentials.apiKey,
+            'Authorization': `Bearer ${credentials.apiKey}`,
             'Content-Type': 'application/json',
         };
         for (let i = 0; i < items.length; i++) {
@@ -530,7 +530,7 @@ class WhatsAppMultiSession {
                             url: `${baseUrl}/api/sessions/${sessionId}/send`,
                             headers: authHeaders,
                             body: {
-                                phone: phoneNumber,
+                                to: phoneNumber,
                                 message: messageText,
                             },
                             json: true,
@@ -545,7 +545,7 @@ class WhatsAppMultiSession {
                             url: `${baseUrl}/api/sessions/${sessionId}/send-image`,
                             headers: authHeaders,
                             body: {
-                                phone: phoneNumber,
+                                to: phoneNumber,
                                 image_url: imageUrl,
                                 caption: caption,
                             },
@@ -561,7 +561,7 @@ class WhatsAppMultiSession {
                             url: `${baseUrl}/api/sessions/${sessionId}/send-document`,
                             headers: authHeaders,
                             body: {
-                                phone: phoneNumber,
+                                to: phoneNumber,
                                 document_url: documentUrl,
                                 filename: filename,
                             },
@@ -578,7 +578,7 @@ class WhatsAppMultiSession {
                             url: `${baseUrl}/api/sessions/${sessionId}/send-location`,
                             headers: authHeaders,
                             body: {
-                                phone: phoneNumber,
+                                to: phoneNumber,
                                 latitude: latitude,
                                 longitude: longitude,
                                 name: locationName,
@@ -606,7 +606,7 @@ class WhatsAppMultiSession {
                             url: `${baseUrl}/api/sessions/${sessionId}/check-phone`,
                             headers: authHeaders,
                             body: {
-                                phone: phoneNumber,
+                                to: phoneNumber,
                             },
                             json: true,
                         });
@@ -622,7 +622,7 @@ class WhatsAppMultiSession {
                             url: `${baseUrl}/api/sessions/${sessionId}/typing`,
                             headers: authHeaders,
                             body: {
-                                phone: phoneNumber,
+                                to: phoneNumber,
                                 typing: true,
                             },
                             json: true,
@@ -635,7 +635,7 @@ class WhatsAppMultiSession {
                             url: `${baseUrl}/api/sessions/${sessionId}/typing`,
                             headers: authHeaders,
                             body: {
-                                phone: phoneNumber,
+                                to: phoneNumber,
                                 typing: false,
                             },
                             json: true,

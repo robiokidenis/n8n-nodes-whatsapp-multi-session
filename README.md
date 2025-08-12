@@ -158,6 +158,8 @@ docker-compose up -d
 
 ### 6. Receive WhatsApp Messages (Webhook Trigger)
 
+The webhook trigger allows you to customize the webhook URL path for better organization:
+
 ```json
 {
   "nodes": [
@@ -165,6 +167,7 @@ docker-compose up -d
       "name": "WhatsApp Message Received",
       "type": "n8n-nodes-whatsapp-multi-session.whatsAppMultiSessionTrigger",
       "parameters": {
+        "webhookPath": "my-whatsapp-bot",
         "sessionIdFilter": "my_session",
         "messageTypeFilter": "text",
         "includeSystemMessages": false
@@ -191,6 +194,17 @@ docker-compose up -d
   ]
 }
 ```
+
+**Webhook URL Format:**
+- If you set `webhookPath` to `"my-whatsapp-bot"`
+- The full webhook URL will be: `https://your-n8n-domain.com/webhook/my-whatsapp-bot`
+- Configure this URL in your WhatsApp API server
+
+**Benefits of Custom Webhook Paths:**
+- **Organization**: Different paths for different bots/workflows
+- **Security**: Harder to guess webhook endpoints
+- **Multiple Instances**: Run multiple WhatsApp triggers simultaneously
+- **Easy Debugging**: Clear webhook paths in logs
 
 ## Common Workflow Patterns
 
@@ -247,6 +261,7 @@ docker-compose up -d
 
 ### Webhook Trigger Node
 - **WhatsApp Multi-Session Trigger**: Dedicated trigger node for receiving incoming messages
+- **Custom Webhook Path**: Set your own webhook path for organized webhook management
 - **Message Filtering**: Filter by session ID, message type, and system messages
 - **Structured Data**: Clean, structured webhook data with phone number extraction
 - **Real-time Processing**: Immediate processing of incoming WhatsApp messages

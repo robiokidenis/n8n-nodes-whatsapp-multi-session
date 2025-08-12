@@ -474,7 +474,7 @@ export class WhatsAppMultiSession implements INodeType {
 
 		// Use API key for authentication
 		const authHeaders = {
-			'X-API-Key': credentials.apiKey as string,
+			'Authorization': `Bearer ${credentials.apiKey as string}`,
 			'Content-Type': 'application/json',
 		};
 
@@ -558,7 +558,7 @@ export class WhatsAppMultiSession implements INodeType {
 							url: `${baseUrl}/api/sessions/${sessionId}/send`,
 							headers: authHeaders,
 							body: {
-								phone: phoneNumber,
+								to: phoneNumber,
 								message: messageText,
 							},
 							json: true,
@@ -573,7 +573,7 @@ export class WhatsAppMultiSession implements INodeType {
 							url: `${baseUrl}/api/sessions/${sessionId}/send-image`,
 							headers: authHeaders,
 							body: {
-								phone: phoneNumber,
+								to: phoneNumber,
 								image_url: imageUrl,
 								caption: caption,
 							},
@@ -589,7 +589,7 @@ export class WhatsAppMultiSession implements INodeType {
 							url: `${baseUrl}/api/sessions/${sessionId}/send-document`,
 							headers: authHeaders,
 							body: {
-								phone: phoneNumber,
+								to: phoneNumber,
 								document_url: documentUrl,
 								filename: filename,
 							},
@@ -606,7 +606,7 @@ export class WhatsAppMultiSession implements INodeType {
 							url: `${baseUrl}/api/sessions/${sessionId}/send-location`,
 							headers: authHeaders,
 							body: {
-								phone: phoneNumber,
+								to: phoneNumber,
 								latitude: latitude,
 								longitude: longitude,
 								name: locationName,
@@ -635,7 +635,7 @@ export class WhatsAppMultiSession implements INodeType {
 							url: `${baseUrl}/api/sessions/${sessionId}/check-phone`,
 							headers: authHeaders,
 							body: {
-								phone: phoneNumber,
+								to: phoneNumber,
 							},
 							json: true,
 						});
@@ -652,7 +652,7 @@ export class WhatsAppMultiSession implements INodeType {
 						url: `${baseUrl}/api/sessions/${sessionId}/typing`,
 						headers: authHeaders,
 						body: {
-							phone: phoneNumber,
+							to: phoneNumber,
 							typing: true,
 						},
 						json: true,
@@ -665,7 +665,7 @@ export class WhatsAppMultiSession implements INodeType {
 						url: `${baseUrl}/api/sessions/${sessionId}/typing`,
 						headers: authHeaders,
 						body: {
-							phone: phoneNumber,
+							to: phoneNumber,
 							typing: false,
 						},
 						json: true,
