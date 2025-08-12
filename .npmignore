@@ -1,0 +1,51 @@
+# Source files
+/nodes
+/credentials
+*.ts
+tsconfig.json
+gulpfile.js
+
+# Development files
+.eslintrc.js
+.eslintrc.prepublish.js
+.prettierrc
+
+# Build files
+*.tsbuildinfo
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Dependencies
+node_modules/
+
+# Testing
+*.test.js
+test/
+tests/
+spec/
+
+# Documentation source (keep README.md)
+docs/
+*.draft.md
+
+# Git
+.git/
+.gitignore
+
+# GitHub
+.github/
+
+# Misc
+.env
+.env.local
+.env.*.local
