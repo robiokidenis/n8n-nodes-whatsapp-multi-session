@@ -139,6 +139,18 @@ class WhatsAppMultiSession {
                             description: 'Send a location',
                             action: 'Send a location',
                         },
+                        {
+                            name: 'Forward Message',
+                            value: 'forwardMessage',
+                            description: 'Forward an existing message',
+                            action: 'Forward a message',
+                        },
+                        {
+                            name: 'Reply to Message',
+                            value: 'replyMessage',
+                            description: 'Reply to a specific message',
+                            action: 'Reply to a message',
+                        },
                     ],
                     default: 'sendText',
                 },
@@ -392,6 +404,83 @@ class WhatsAppMultiSession {
                     placeholder: 'Jakarta, Indonesia',
                     description: 'Optional name for the location',
                 },
+                // Forward message fields
+                {
+                    displayName: 'Target Phone Number',
+                    name: 'targetPhoneNumber',
+                    type: 'string',
+                    required: true,
+                    displayOptions: {
+                        show: {
+                            resource: ['message'],
+                            operation: ['forwardMessage'],
+                        },
+                    },
+                    default: '',
+                    placeholder: '6281234567890',
+                    description: 'Phone number to forward the message to (with country code, no +)',
+                },
+                {
+                    displayName: 'Message ID to Forward',
+                    name: 'forwardMessageId',
+                    type: 'string',
+                    required: true,
+                    displayOptions: {
+                        show: {
+                            resource: ['message'],
+                            operation: ['forwardMessage'],
+                        },
+                    },
+                    default: '',
+                    placeholder: '3EB0D136B13F32830F7B88',
+                    description: 'ID of the message to forward (from webhook data)',
+                },
+                // Reply message fields
+                {
+                    displayName: 'Reply Text',
+                    name: 'replyText',
+                    type: 'string',
+                    required: true,
+                    displayOptions: {
+                        show: {
+                            resource: ['message'],
+                            operation: ['replyMessage'],
+                        },
+                    },
+                    default: '',
+                    placeholder: 'Thank you for your message!',
+                    description: 'The reply message text',
+                },
+                {
+                    displayName: 'Target Phone Number',
+                    name: 'replyTargetPhone',
+                    type: 'string',
+                    required: true,
+                    displayOptions: {
+                        show: {
+                            resource: ['message'],
+                            operation: ['replyMessage'],
+                        },
+                    },
+                    default: '',
+                    placeholder: '6281234567890',
+                    description: 'Phone number to send the reply to (with country code, no +)',
+                },
+                {
+                    displayName: 'Quoted Message ID',
+                    name: 'quotedMessageId',
+                    type: 'string',
+                    required: true,
+                    displayOptions: {
+                        show: {
+                            resource: ['message'],
+                            operation: ['replyMessage'],
+                        },
+                    },
+                    default: '',
+                    placeholder: '3EB0D136B13F32830F7B88',
+                    description: 'ID of the message to reply to (from webhook data)',
+                },
                 // Contact check field
                 {
                     displayName: 'Phone Number',
@@ -582,6 +671,38 @@ class WhatsAppMultiSession {
                                 latitude: latitude,
                                 longitude: longitude,
                                 name: locationName,
+                            },
+                            json: true,
+                        });
+                        returnData.push(response);
+                    }
+                    else if (operation === 'forwardMessage') {
+                        const targetPhoneNumber = this.getNodeParameter('targetPhoneNumber', i);
+                        const forwardMessageId = this.getNodeParameter('forwardMessageId', i);
+                        const response = await this.helpers.request({
+                            method: 'POST',
+                            url: `${baseUrl}/api/sessions/${sessionId}/forward`,
+                            headers: authHeaders,
+                            body: {
+                                to: targetPhoneNumber,
+                                message_id: forwardMessageId,
+                            },
+                            json: true,
+                        });
+                        returnData.push(response);
+                    }
+                    else if (operation === 'replyMessage') {
+                        const replyText = this.getNodeParameter('replyText', i);
+                        const replyTargetPhone = this.getNodeParameter('replyTargetPhone', i);
+                        const quotedMessageId = this.getNodeParameter('quotedMessageId', i);
+                        const response = await this.helpers.request({
+                            method: 'POST',
+                            url: `${baseUrl}/api/sessions/${sessionId}/reply`,
+                            headers: authHeaders,
+                            body: {
+                                to: replyTargetPhone,
+                                message: replyText,
+                                quoted_message_id: quotedMessageId,
                             },
                             json: true,
                         });

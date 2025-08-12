@@ -5,7 +5,7 @@ This is an n8n community node for integrating with WhatsApp Multi-Session API. I
 ## Features
 
 - 📱 **Session Management**: Create, connect, disconnect, and manage WhatsApp sessions
-- 💬 **Message Sending**: Send text, images, documents, and location messages
+- 💬 **Message Operations**: Send, forward, and reply to messages (text, images, documents, locations)
 - 👥 **Contact Management**: List contacts and check if numbers are on WhatsApp
 - ⌨️ **Typing Indicators**: Show/hide typing status for better user experience
 - 🔗 **Webhook Support**: Receive real-time message notifications
@@ -195,6 +195,31 @@ The webhook trigger allows you to customize the webhook URL path for better orga
 }
 ```
 
+### 7. Forward Message
+
+```json
+{
+  "resource": "message",
+  "operation": "forwardMessage",
+  "sessionId": "session_123",
+  "targetPhoneNumber": "6281234567890",
+  "forwardMessageId": "3EB0D136B13F32830F7B88"
+}
+```
+
+### 8. Reply to Message
+
+```json
+{
+  "resource": "message",
+  "operation": "replyMessage",
+  "sessionId": "session_123",
+  "replyText": "Thanks for your message!",
+  "replyTargetPhone": "6281234567890",
+  "quotedMessageId": "3EB0D136B13F32830F7B88"
+}
+```
+
 **Webhook URL Format:**
 - If you set `webhookPath` to `"my-whatsapp-bot"`
 - The full webhook URL will be: `https://your-n8n-domain.com/webhook/my-whatsapp-bot`
@@ -208,9 +233,67 @@ The webhook trigger allows you to customize the webhook URL path for better orga
 
 ## Common Workflow Patterns
 
-### 1. Customer Support Bot
+### 1. Auto-Reply Bot with Forward and Reply
 
-1. **Webhook Trigger** → Receive incoming messages
+```json
+{
+  "nodes": [
+    {
+      "name": "WhatsApp Message Received",
+      "type": "n8n-nodes-whatsapp-multi-session.whatsAppMultiSessionTrigger",
+      "parameters": {
+        "webhookPath": "auto-reply-bot",
+        "messageTypeFilter": "text"
+      }
+    },
+    {
+      "name": "Check Message Content",
+      "type": "n8n-nodes-base.switch",
+      "parameters": {
+        "rules": [
+          {
+            "operation": "contains",
+            "value1": "={{$json.message}}",
+            "value2": "forward"
+          },
+          {
+            "operation": "contains",
+            "value1": "={{$json.message}}",
+            "value2": "help"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Forward to Admin",
+      "type": "n8n-nodes-whatsapp-multi-session.whatsAppMultiSession",
+      "parameters": {
+        "resource": "message",
+        "operation": "forwardMessage",
+        "sessionId": "={{$json.session_id}}",
+        "targetPhoneNumber": "6281234567890",
+        "forwardMessageId": "={{$json.id}}"
+      }
+    },
+    {
+      "name": "Send Help Reply",
+      "type": "n8n-nodes-whatsapp-multi-session.whatsAppMultiSession",
+      "parameters": {
+        "resource": "message",
+        "operation": "replyMessage",
+        "sessionId": "={{$json.session_id}}",
+        "replyText": "Here's how I can help you: ...",
+        "replyTargetPhone": "={{$json.from_phone}}",
+        "quotedMessageId": "={{$json.id}}"
+      }
+    }
+  ]
+}
+```
+
+### 2. Customer Support Bot
+
+1. **WhatsApp Multi-Session Trigger** → Receive incoming messages
 2. **WhatsApp Multi-Session** → Check contact info
 3. **AI Node** → Process message with ChatGPT/Claude
 4. **WhatsApp Multi-Session** → Send automated response
@@ -245,6 +328,8 @@ The webhook trigger allows you to customize the webhook URL path for better orga
 - **Send Image**: Send images with optional captions
 - **Send Document**: Send files/documents
 - **Send Location**: Send GPS coordinates
+- **Forward Message**: Forward an existing message to another contact
+- **Reply to Message**: Reply to a specific message with quoted content
 
 ### Contact Operations
 - **List**: Get all contacts from session
