@@ -515,4 +515,134 @@
 }
 ```
 
+### 12. Message Forwarding System
+
+**Use Case**: Forward important messages between teams or escalate customer issues
+
+```json
+{
+  "nodes": [
+    {
+      "name": "Webhook - Message Received",
+      "type": "n8n-nodes-base.webhook",
+      "parameters": {
+        "path": "whatsapp-received",
+        "httpMethod": "POST"
+      }
+    },
+    {
+      "name": "Check for Keywords",
+      "type": "n8n-nodes-base.if",
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "operation": "contains",
+              "value1": "={{$json.message.text || $json.message.conversation}}",
+              "value2": "urgent"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Forward to Manager",
+      "type": "n8n-nodes-whatsapp-multi-session.whatsAppMultiSession",
+      "parameters": {
+        "resource": "message",
+        "operation": "forwardMessage",
+        "sessionId": "team_manager",
+        "phoneNumber": "6281234567890",
+        "forwardMessageId": "={{$json.id}}",
+        "forwardMessageText": "={{$json.message.text || $json.message.conversation}}"
+      }
+    },
+    {
+      "name": "Send Escalation Note",
+      "type": "n8n-nodes-whatsapp-multi-session.whatsAppMultiSession",
+      "parameters": {
+        "resource": "message",
+        "operation": "sendText",
+        "sessionId": "team_manager",
+        "phoneNumber": "6281234567890",
+        "messageText": "🚨 Urgent message forwarded from {{$json.from}}\n\nPlease handle with priority."
+      }
+    }
+  ]
+}
+```
+
+### 13. Customer Service Message Distribution
+
+**Use Case**: Automatically forward customer messages to appropriate departments
+
+```json
+{
+  "nodes": [
+    {
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook"
+    },
+    {
+      "name": "Determine Department",
+      "type": "n8n-nodes-base.switch",
+      "parameters": {
+        "rules": [
+          {
+            "operation": "contains",
+            "value1": "={{$json.message.text}}",
+            "value2": "billing"
+          },
+          {
+            "operation": "contains",
+            "value1": "={{$json.message.text}}",
+            "value2": "technical"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Forward to Billing Team",
+      "type": "n8n-nodes-whatsapp-multi-session.whatsAppMultiSession",
+      "parameters": {
+        "resource": "message",
+        "operation": "forwardMessage",
+        "sessionId": "billing_team",
+        "phoneNumber": "6281234567891",
+        "forwardMessageId": "={{$json.id}}",
+        "forwardMessageText": "={{$json.message.text || $json.message.conversation}}"
+      }
+    },
+    {
+      "name": "Forward to Tech Support",
+      "type": "n8n-nodes-whatsapp-multi-session.whatsAppMultiSession",
+      "parameters": {
+        "resource": "message",
+        "operation": "forwardMessage",
+        "sessionId": "tech_support",
+        "phoneNumber": "6281234567892",
+        "forwardMessageId": "={{$json.id}}",
+        "forwardMessageText": "={{$json.message.text || $json.message.conversation}}"
+      }
+    }
+  ]
+}
+```
+
+## Updated Forward Message API (v1.4.0)
+
+**Important Note**: Starting with version 1.4.0, the forward message operation now requires both the original message ID and the message text content. This ensures that the forwarded message preserves the original content properly.
+
+**Required Parameters**:
+- `forwardMessageId`: The ID of the original message to forward
+- `forwardMessageText`: The text content of the message to forward
+
+**Example Usage**:
+```json
+{
+  "forwardMessageId": "{{$json.id}}",
+  "forwardMessageText": "{{$json.message.text || $json.message.conversation}}"
+}
+```
+
 These examples demonstrate the flexibility and power of the WhatsApp Multi-Session n8n node. You can combine these patterns to create sophisticated automation workflows for your business needs.

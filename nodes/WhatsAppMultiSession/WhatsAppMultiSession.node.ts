@@ -444,6 +444,22 @@ export class WhatsAppMultiSession implements INodeType {
 				description: 'ID of the message to forward (from webhook trigger data: {{$json.id}}). Must be from the same session.',
 			},
 
+			{
+				displayName: 'Message Text',
+				name: 'forwardMessageText',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['forwardMessage'],
+					},
+				},
+				default: '',
+				placeholder: 'Hello, this is the message content to forward',
+				description: 'The text content of the message to forward (from webhook trigger data: {{$json.message.text || $json.message.conversation}})',
+			},
+
 			// Reply message fields
 			{
 				displayName: 'Reply Text',
@@ -681,6 +697,7 @@ export class WhatsAppMultiSession implements INodeType {
 
 					} else if (operation === 'forwardMessage') {
 						const forwardMessageId = this.getNodeParameter('forwardMessageId', i) as string;
+						const forwardMessageText = this.getNodeParameter('forwardMessageText', i) as string;
 						const response = await this.helpers.request({
 							method: 'POST',
 							url: `${baseUrl}/api/sessions/${sessionId}/forward`,
@@ -688,6 +705,7 @@ export class WhatsAppMultiSession implements INodeType {
 							body: {
 								to: phoneNumber,
 								message_id: forwardMessageId,
+								text: forwardMessageText,
 							},
 							json: true,
 						});
