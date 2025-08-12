@@ -406,21 +406,6 @@ class WhatsAppMultiSession {
                 },
                 // Forward message fields
                 {
-                    displayName: 'Target Phone Number',
-                    name: 'targetPhoneNumber',
-                    type: 'string',
-                    required: true,
-                    displayOptions: {
-                        show: {
-                            resource: ['message'],
-                            operation: ['forwardMessage'],
-                        },
-                    },
-                    default: '',
-                    placeholder: '6281234567890',
-                    description: 'Phone number to forward the message to (with country code, no +)',
-                },
-                {
                     displayName: 'Message ID to Forward',
                     name: 'forwardMessageId',
                     type: 'string',
@@ -433,7 +418,7 @@ class WhatsAppMultiSession {
                     },
                     default: '',
                     placeholder: '3EB0D136B13F32830F7B88',
-                    description: 'ID of the message to forward (from webhook data)',
+                    description: 'ID of the message to forward (from webhook trigger data: {{$json.id}}). Must be from the same session.',
                 },
                 // Reply message fields
                 {
@@ -452,21 +437,6 @@ class WhatsAppMultiSession {
                     description: 'The reply message text',
                 },
                 {
-                    displayName: 'Target Phone Number',
-                    name: 'replyTargetPhone',
-                    type: 'string',
-                    required: true,
-                    displayOptions: {
-                        show: {
-                            resource: ['message'],
-                            operation: ['replyMessage'],
-                        },
-                    },
-                    default: '',
-                    placeholder: '6281234567890',
-                    description: 'Phone number to send the reply to (with country code, no +)',
-                },
-                {
                     displayName: 'Quoted Message ID',
                     name: 'quotedMessageId',
                     type: 'string',
@@ -479,7 +449,7 @@ class WhatsAppMultiSession {
                     },
                     default: '',
                     placeholder: '3EB0D136B13F32830F7B88',
-                    description: 'ID of the message to reply to (from webhook data)',
+                    description: 'ID of the message to reply to (from webhook trigger data: {{$json.id}}). Must be from the same session.',
                 },
                 // Contact check field
                 {
@@ -677,14 +647,13 @@ class WhatsAppMultiSession {
                         returnData.push(response);
                     }
                     else if (operation === 'forwardMessage') {
-                        const targetPhoneNumber = this.getNodeParameter('targetPhoneNumber', i);
                         const forwardMessageId = this.getNodeParameter('forwardMessageId', i);
                         const response = await this.helpers.request({
                             method: 'POST',
                             url: `${baseUrl}/api/sessions/${sessionId}/forward`,
                             headers: authHeaders,
                             body: {
-                                to: targetPhoneNumber,
+                                to: phoneNumber,
                                 message_id: forwardMessageId,
                             },
                             json: true,
@@ -693,14 +662,13 @@ class WhatsAppMultiSession {
                     }
                     else if (operation === 'replyMessage') {
                         const replyText = this.getNodeParameter('replyText', i);
-                        const replyTargetPhone = this.getNodeParameter('replyTargetPhone', i);
                         const quotedMessageId = this.getNodeParameter('quotedMessageId', i);
                         const response = await this.helpers.request({
                             method: 'POST',
                             url: `${baseUrl}/api/sessions/${sessionId}/reply`,
                             headers: authHeaders,
                             body: {
-                                to: replyTargetPhone,
+                                to: phoneNumber,
                                 message: replyText,
                                 quoted_message_id: quotedMessageId,
                             },

@@ -202,10 +202,16 @@ The webhook trigger allows you to customize the webhook URL path for better orga
   "resource": "message",
   "operation": "forwardMessage",
   "sessionId": "session_123",
-  "targetPhoneNumber": "6281234567890",
-  "forwardMessageId": "3EB0D136B13F32830F7B88"
+  "phoneNumber": "6281234567890",
+  "forwardMessageId": "={{$json.id}}"
 }
 ```
+
+**⚠️ Important for Forward Messages:**
+- Use `{{$json.id}}` from the webhook trigger data
+- Message ID must be from the **same session** you're forwarding from
+- Recent messages (last few hours) work better
+- If forwarded message appears empty, check if the original message still exists in the session
 
 ### 8. Reply to Message
 
@@ -214,9 +220,9 @@ The webhook trigger allows you to customize the webhook URL path for better orga
   "resource": "message",
   "operation": "replyMessage",
   "sessionId": "session_123",
+  "phoneNumber": "={{$json.from_phone}}",
   "replyText": "Thanks for your message!",
-  "replyTargetPhone": "6281234567890",
-  "quotedMessageId": "3EB0D136B13F32830F7B88"
+  "quotedMessageId": "={{$json.id}}"
 }
 ```
 
@@ -393,6 +399,34 @@ Enable debug mode in n8n to see detailed API requests and responses:
 1. Set environment variable: `N8N_LOG_LEVEL=debug`
 2. Restart n8n
 3. Check logs for detailed error information
+
+### Forward/Reply Message Issues
+
+**Problem**: Forward message appears empty or reply doesn't show quoted message
+
+**Causes & Solutions**:
+1. **Wrong Session**: Message ID from different session
+   - ✅ Ensure `sessionId` matches the session where original message was received
+
+2. **Old Message ID**: Message might have been deleted or expired  
+   - ✅ Use recent messages (within last few hours)
+   - ✅ Test with a fresh message from the webhook trigger
+
+3. **Message ID Format**: Using wrong message ID format
+   - ✅ Use `{{$json.id}}` directly from webhook data
+   - ✅ Don't modify or parse the message ID
+
+4. **API Server Issue**: Message not found in API database
+   - ✅ Check API server logs for "message not found" errors
+   - ✅ Verify message exists in WhatsApp session storage
+
+**Test Forward/Reply**:
+```bash
+# 1. Send a test message to your WhatsApp
+# 2. Check the webhook data for the message ID
+# 3. Immediately try to forward that message
+# 4. If it works, the issue is message ID timing/storage
+```
 
 ## API Server Requirements
 
