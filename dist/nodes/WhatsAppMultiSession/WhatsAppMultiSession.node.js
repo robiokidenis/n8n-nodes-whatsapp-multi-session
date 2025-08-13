@@ -509,9 +509,29 @@ class WhatsAppMultiSession {
                             value: 'binary',
                             description: 'Return image as binary data buffer',
                         },
+                        {
+                            name: 'File',
+                            value: 'file',
+                            description: 'Return image as downloadable file attachment',
+                        },
                     ],
                     default: 'base64',
                     description: 'Format for the downloaded image data',
+                },
+                {
+                    displayName: 'Put Output File in Field',
+                    name: 'outputFileField',
+                    type: 'string',
+                    displayOptions: {
+                        show: {
+                            resource: ['message'],
+                            operation: ['downloadImage'],
+                            outputFormat: ['file'],
+                        },
+                    },
+                    default: 'data',
+                    placeholder: 'data',
+                    description: 'Name of the binary property to write the file to',
                 },
                 // Contact check field
                 {
@@ -586,7 +606,9 @@ class WhatsAppMultiSession {
                             headers: authHeaders,
                             json: true,
                         });
-                        returnData.push(...response.sessions);
+                        response.sessions.forEach((session) => {
+                            returnData.push({ json: session });
+                        });
                     }
                     else if (operation === 'create') {
                         const sessionName = this.getNodeParameter('sessionName', i);
@@ -599,7 +621,7 @@ class WhatsAppMultiSession {
                             },
                             json: true,
                         });
-                        returnData.push(response);
+                        returnData.push({ json: response });
                     }
                     else if (operation === 'get') {
                         const sessionId = this.getNodeParameter('sessionId', i);
@@ -609,7 +631,7 @@ class WhatsAppMultiSession {
                             headers: authHeaders,
                             json: true,
                         });
-                        returnData.push(response);
+                        returnData.push({ json: response });
                     }
                     else if (operation === 'connect') {
                         const sessionId = this.getNodeParameter('sessionId', i);
@@ -619,7 +641,7 @@ class WhatsAppMultiSession {
                             headers: authHeaders,
                             json: true,
                         });
-                        returnData.push(response);
+                        returnData.push({ json: response });
                     }
                     else if (operation === 'disconnect') {
                         const sessionId = this.getNodeParameter('sessionId', i);
@@ -629,7 +651,7 @@ class WhatsAppMultiSession {
                             headers: authHeaders,
                             json: true,
                         });
-                        returnData.push(response);
+                        returnData.push({ json: response });
                     }
                     else if (operation === 'delete') {
                         const sessionId = this.getNodeParameter('sessionId', i);
@@ -639,7 +661,7 @@ class WhatsAppMultiSession {
                             headers: authHeaders,
                             json: true,
                         });
-                        returnData.push(response);
+                        returnData.push({ json: response });
                     }
                 }
                 else if (resource === 'message') {
@@ -657,7 +679,7 @@ class WhatsAppMultiSession {
                             },
                             json: true,
                         });
-                        returnData.push(response);
+                        returnData.push({ json: response });
                     }
                     else if (operation === 'sendImage') {
                         const imageUrl = this.getNodeParameter('imageUrl', i);
@@ -673,7 +695,7 @@ class WhatsAppMultiSession {
                             },
                             json: true,
                         });
-                        returnData.push(response);
+                        returnData.push({ json: response });
                     }
                     else if (operation === 'sendDocument') {
                         const documentUrl = this.getNodeParameter('documentUrl', i);
@@ -689,7 +711,7 @@ class WhatsAppMultiSession {
                             },
                             json: true,
                         });
-                        returnData.push(response);
+                        returnData.push({ json: response });
                     }
                     else if (operation === 'sendLocation') {
                         const latitude = this.getNodeParameter('latitude', i);
@@ -707,7 +729,7 @@ class WhatsAppMultiSession {
                             },
                             json: true,
                         });
-                        returnData.push(response);
+                        returnData.push({ json: response });
                     }
                     else if (operation === 'forwardMessage') {
                         const forwardMessageId = this.getNodeParameter('forwardMessageId', i);
@@ -723,7 +745,7 @@ class WhatsAppMultiSession {
                             },
                             json: true,
                         });
-                        returnData.push(response);
+                        returnData.push({ json: response });
                     }
                     else if (operation === 'replyMessage') {
                         const replyText = this.getNodeParameter('replyText', i);
@@ -739,7 +761,7 @@ class WhatsAppMultiSession {
                             },
                             json: true,
                         });
-                        returnData.push(response);
+                        returnData.push({ json: response });
                     }
                     else if (operation === 'downloadImage') {
                         const mediaUrl = this.getNodeParameter('mediaUrl', i);
@@ -756,8 +778,12 @@ class WhatsAppMultiSession {
                                 },
                                 encoding: null, // This ensures binary data is returned as Buffer
                             });
+                            // Extract filename from URL
+                            const urlParts = mediaUrl.split('/');
+                            const filenameWithParams = urlParts[urlParts.length - 1];
+                            const filename = filenameWithParams.split('?')[0]; // Remove query parameters
                             // Determine content type from URL or default
-                            const ext = (_a = mediaUrl.split('.').pop()) === null || _a === void 0 ? void 0 : _a.toLowerCase();
+                            const ext = (_a = filename.split('.').pop()) === null || _a === void 0 ? void 0 : _a.toLowerCase();
                             let mimeType = 'application/octet-stream';
                             if (ext === 'jpg' || ext === 'jpeg')
                                 mimeType = 'image/jpeg';
@@ -769,27 +795,61 @@ class WhatsAppMultiSession {
                                 mimeType = 'application/pdf';
                             else if (ext === 'mp4')
                                 mimeType = 'video/mp4';
+                            else if (ext === 'mp3')
+                                mimeType = 'audio/mpeg';
+                            else if (ext === 'ogg')
+                                mimeType = 'audio/ogg';
                             if (outputFormat === 'base64') {
                                 // Return as base64
                                 const base64Data = Buffer.from(response).toString('base64');
                                 returnData.push({
-                                    success: true,
-                                    message: 'Image downloaded successfully',
-                                    data: base64Data,
-                                    size: response.length,
-                                    mimeType: mimeType,
-                                    format: 'base64',
+                                    json: {
+                                        success: true,
+                                        message: 'Image downloaded successfully',
+                                        data: base64Data,
+                                        size: response.length,
+                                        mimeType: mimeType,
+                                        format: 'base64',
+                                        filename: filename,
+                                    }
                                 });
                             }
-                            else {
+                            else if (outputFormat === 'binary') {
                                 // Return as binary buffer
                                 returnData.push({
-                                    success: true,
-                                    message: 'Image downloaded successfully',
-                                    data: response,
-                                    size: response.length,
+                                    json: {
+                                        success: true,
+                                        message: 'Image downloaded successfully',
+                                        data: response,
+                                        size: response.length,
+                                        mimeType: mimeType,
+                                        format: 'binary',
+                                        filename: filename,
+                                    }
+                                });
+                            }
+                            else if (outputFormat === 'file') {
+                                // Return as n8n binary file attachment
+                                const outputFileField = this.getNodeParameter('outputFileField', i, 'data');
+                                const binaryData = {
+                                    data: Buffer.from(response).toString('base64'),
                                     mimeType: mimeType,
-                                    format: 'binary',
+                                    fileName: filename,
+                                    fileExtension: ext || '',
+                                };
+                                // Create the return item with binary data
+                                returnData.push({
+                                    json: {
+                                        success: true,
+                                        message: 'Image downloaded successfully',
+                                        size: response.length,
+                                        mimeType: mimeType,
+                                        format: 'file',
+                                        filename: filename,
+                                    },
+                                    binary: {
+                                        [outputFileField]: binaryData,
+                                    },
                                 });
                             }
                         }
@@ -807,7 +867,9 @@ class WhatsAppMultiSession {
                             headers: authHeaders,
                             json: true,
                         });
-                        returnData.push(...response.contacts);
+                        response.contacts.forEach((contact) => {
+                            returnData.push({ json: contact });
+                        });
                     }
                     else if (operation === 'check') {
                         const phoneNumber = this.getNodeParameter('phoneNumber', i);
@@ -820,7 +882,7 @@ class WhatsAppMultiSession {
                             },
                             json: true,
                         });
-                        returnData.push(response);
+                        returnData.push({ json: response });
                     }
                 }
                 else if (resource === 'typing') {
@@ -837,7 +899,7 @@ class WhatsAppMultiSession {
                             },
                             json: true,
                         });
-                        returnData.push(response);
+                        returnData.push({ json: response });
                     }
                     else if (operation === 'stopTyping') {
                         const response = await this.helpers.request({
@@ -850,7 +912,7 @@ class WhatsAppMultiSession {
                             },
                             json: true,
                         });
-                        returnData.push(response);
+                        returnData.push({ json: response });
                     }
                 }
                 else if (resource === 'webhook') {
@@ -866,7 +928,7 @@ class WhatsAppMultiSession {
                             },
                             json: true,
                         });
-                        returnData.push(response);
+                        returnData.push({ json: response });
                     }
                     else if (operation === 'getUrl') {
                         const response = await this.helpers.request({
@@ -875,7 +937,7 @@ class WhatsAppMultiSession {
                             headers: authHeaders,
                             json: true,
                         });
-                        returnData.push(response);
+                        returnData.push({ json: response });
                     }
                     else if (operation === 'remove') {
                         const response = await this.helpers.request({
@@ -884,20 +946,20 @@ class WhatsAppMultiSession {
                             headers: authHeaders,
                             json: true,
                         });
-                        returnData.push(response);
+                        returnData.push({ json: response });
                     }
                 }
             }
             catch (error) {
                 if (this.continueOnFail()) {
-                    returnData.push({ error: error.message });
+                    returnData.push({ json: { error: error.message } });
                 }
                 else {
                     throw error;
                 }
             }
         }
-        return [this.helpers.returnJsonArray(returnData)];
+        return [returnData];
     }
 }
 exports.WhatsAppMultiSession = WhatsAppMultiSession;

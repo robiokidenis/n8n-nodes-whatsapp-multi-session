@@ -5,6 +5,7 @@ import {
 	INodeType,
 	INodeTypeDescription,
 	NodeConnectionType,
+	IBinaryData,
 } from 'n8n-workflow';
 
 export class WhatsAppMultiSession implements INodeType {
@@ -538,9 +539,30 @@ export class WhatsAppMultiSession implements INodeType {
 						value: 'binary',
 						description: 'Return image as binary data buffer',
 					},
+					{
+						name: 'File',
+						value: 'file',
+						description: 'Return image as downloadable file attachment',
+					},
 				],
 				default: 'base64',
 				description: 'Format for the downloaded image data',
+			},
+
+			{
+				displayName: 'Put Output File in Field',
+				name: 'outputFileField',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['downloadImage'],
+						outputFormat: ['file'],
+					},
+				},
+				default: 'data',
+				placeholder: 'data',
+				description: 'Name of the binary property to write the file to',
 			},
 
 			// Contact check field
@@ -597,7 +619,7 @@ export class WhatsAppMultiSession implements INodeType {
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
-		const returnData: IDataObject[] = [];
+		const returnData: INodeExecutionData[] = [];
 		const credentials = await this.getCredentials('whatsAppMultiSessionApi');
 		const baseUrl = credentials.serverUrl as string;
 
@@ -620,7 +642,9 @@ export class WhatsAppMultiSession implements INodeType {
 							headers: authHeaders,
 							json: true,
 						});
-						returnData.push(...response.sessions);
+						response.sessions.forEach((session: IDataObject) => {
+							returnData.push({ json: session });
+						});
 
 					} else if (operation === 'create') {
 						const sessionName = this.getNodeParameter('sessionName', i) as string;
@@ -633,7 +657,7 @@ export class WhatsAppMultiSession implements INodeType {
 							},
 							json: true,
 						});
-						returnData.push(response);
+						returnData.push({ json: response });
 
 					} else if (operation === 'get') {
 						const sessionId = this.getNodeParameter('sessionId', i) as string;
@@ -643,7 +667,7 @@ export class WhatsAppMultiSession implements INodeType {
 							headers: authHeaders,
 							json: true,
 						});
-						returnData.push(response);
+						returnData.push({ json: response });
 
 					} else if (operation === 'connect') {
 						const sessionId = this.getNodeParameter('sessionId', i) as string;
@@ -653,7 +677,7 @@ export class WhatsAppMultiSession implements INodeType {
 							headers: authHeaders,
 							json: true,
 						});
-						returnData.push(response);
+						returnData.push({ json: response });
 
 					} else if (operation === 'disconnect') {
 						const sessionId = this.getNodeParameter('sessionId', i) as string;
@@ -663,7 +687,7 @@ export class WhatsAppMultiSession implements INodeType {
 							headers: authHeaders,
 							json: true,
 						});
-						returnData.push(response);
+						returnData.push({ json: response });
 
 					} else if (operation === 'delete') {
 						const sessionId = this.getNodeParameter('sessionId', i) as string;
@@ -673,7 +697,7 @@ export class WhatsAppMultiSession implements INodeType {
 							headers: authHeaders,
 							json: true,
 						});
-						returnData.push(response);
+						returnData.push({ json: response });
 					}
 
 				} else if (resource === 'message') {
@@ -692,7 +716,7 @@ export class WhatsAppMultiSession implements INodeType {
 							},
 							json: true,
 						});
-						returnData.push(response);
+						returnData.push({ json: response });
 
 					} else if (operation === 'sendImage') {
 						const imageUrl = this.getNodeParameter('imageUrl', i) as string;
@@ -708,7 +732,7 @@ export class WhatsAppMultiSession implements INodeType {
 							},
 							json: true,
 						});
-						returnData.push(response);
+						returnData.push({ json: response });
 
 					} else if (operation === 'sendDocument') {
 						const documentUrl = this.getNodeParameter('documentUrl', i) as string;
@@ -724,7 +748,7 @@ export class WhatsAppMultiSession implements INodeType {
 							},
 							json: true,
 						});
-						returnData.push(response);
+						returnData.push({ json: response });
 
 					} else if (operation === 'sendLocation') {
 						const latitude = this.getNodeParameter('latitude', i) as number;
@@ -742,7 +766,7 @@ export class WhatsAppMultiSession implements INodeType {
 							},
 							json: true,
 						});
-						returnData.push(response);
+						returnData.push({ json: response });
 
 					} else if (operation === 'forwardMessage') {
 						const forwardMessageId = this.getNodeParameter('forwardMessageId', i) as string;
@@ -758,7 +782,7 @@ export class WhatsAppMultiSession implements INodeType {
 							},
 							json: true,
 						});
-						returnData.push(response);
+						returnData.push({ json: response });
 
 					} else if (operation === 'replyMessage') {
 						const replyText = this.getNodeParameter('replyText', i) as string;
@@ -774,7 +798,7 @@ export class WhatsAppMultiSession implements INodeType {
 							},
 							json: true,
 						});
-						returnData.push(response);
+						returnData.push({ json: response });
 
 					} else if (operation === 'downloadImage') {
 						const mediaUrl = this.getNodeParameter('mediaUrl', i) as string;
@@ -794,35 +818,73 @@ export class WhatsAppMultiSession implements INodeType {
 								encoding: null, // This ensures binary data is returned as Buffer
 							});
 
+							// Extract filename from URL
+							const urlParts = mediaUrl.split('/');
+							const filenameWithParams = urlParts[urlParts.length - 1];
+							const filename = filenameWithParams.split('?')[0]; // Remove query parameters
+
 							// Determine content type from URL or default
-							const ext = mediaUrl.split('.').pop()?.toLowerCase();
+							const ext = filename.split('.').pop()?.toLowerCase();
 							let mimeType = 'application/octet-stream';
 							if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
 							else if (ext === 'png') mimeType = 'image/png';
 							else if (ext === 'gif') mimeType = 'image/gif';
 							else if (ext === 'pdf') mimeType = 'application/pdf';
 							else if (ext === 'mp4') mimeType = 'video/mp4';
+							else if (ext === 'mp3') mimeType = 'audio/mpeg';
+							else if (ext === 'ogg') mimeType = 'audio/ogg';
 
 							if (outputFormat === 'base64') {
 								// Return as base64
 								const base64Data = Buffer.from(response).toString('base64');
 								returnData.push({
-									success: true,
-									message: 'Image downloaded successfully',
-									data: base64Data,
-									size: response.length,
-									mimeType: mimeType,
-									format: 'base64',
+									json: {
+										success: true,
+										message: 'Image downloaded successfully',
+										data: base64Data,
+										size: response.length,
+										mimeType: mimeType,
+										format: 'base64',
+										filename: filename,
+									}
 								});
-							} else {
+							} else if (outputFormat === 'binary') {
 								// Return as binary buffer
 								returnData.push({
-									success: true,
-									message: 'Image downloaded successfully',
-									data: response,
-									size: response.length,
+									json: {
+										success: true,
+										message: 'Image downloaded successfully',
+										data: response,
+										size: response.length,
+										mimeType: mimeType,
+										format: 'binary',
+										filename: filename,
+									}
+								});
+							} else if (outputFormat === 'file') {
+								// Return as n8n binary file attachment
+								const outputFileField = this.getNodeParameter('outputFileField', i, 'data') as string;
+								
+								const binaryData: IBinaryData = {
+									data: Buffer.from(response).toString('base64'),
 									mimeType: mimeType,
-									format: 'binary',
+									fileName: filename,
+									fileExtension: ext || '',
+								};
+
+								// Create the return item with binary data
+								returnData.push({
+									json: {
+										success: true,
+										message: 'Image downloaded successfully',
+										size: response.length,
+										mimeType: mimeType,
+										format: 'file',
+										filename: filename,
+									},
+									binary: {
+										[outputFileField]: binaryData,
+									},
 								});
 							}
 						} catch (downloadError) {
@@ -840,7 +902,9 @@ export class WhatsAppMultiSession implements INodeType {
 							headers: authHeaders,
 							json: true,
 						});
-						returnData.push(...response.contacts);
+						response.contacts.forEach((contact: IDataObject) => {
+							returnData.push({ json: contact });
+						});
 
 					} else if (operation === 'check') {
 						const phoneNumber = this.getNodeParameter('phoneNumber', i) as string;
@@ -853,7 +917,7 @@ export class WhatsAppMultiSession implements INodeType {
 							},
 							json: true,
 						});
-						returnData.push(response);
+						returnData.push({ json: response });
 					}
 
 			} else if (resource === 'typing') {
@@ -871,7 +935,7 @@ export class WhatsAppMultiSession implements INodeType {
 						},
 						json: true,
 					});
-					returnData.push(response);
+					returnData.push({ json: response });
 
 				} else if (operation === 'stopTyping') {
 					const response = await this.helpers.request({
@@ -884,7 +948,7 @@ export class WhatsAppMultiSession implements INodeType {
 						},
 						json: true,
 					});
-					returnData.push(response);
+					returnData.push({ json: response });
 				}
 
 			} else if (resource === 'webhook') {
@@ -901,7 +965,7 @@ export class WhatsAppMultiSession implements INodeType {
 						},
 						json: true,
 					});
-					returnData.push(response);
+					returnData.push({ json: response });
 
 				} else if (operation === 'getUrl') {
 					const response = await this.helpers.request({
@@ -910,7 +974,7 @@ export class WhatsAppMultiSession implements INodeType {
 						headers: authHeaders,
 						json: true,
 					});
-					returnData.push(response);
+					returnData.push({ json: response });
 
 				} else if (operation === 'remove') {
 					const response = await this.helpers.request({
@@ -919,19 +983,19 @@ export class WhatsAppMultiSession implements INodeType {
 						headers: authHeaders,
 						json: true,
 					});
-					returnData.push(response);
+					returnData.push({ json: response });
 				}
 			}
 
 			} catch (error) {
 				if (this.continueOnFail()) {
-					returnData.push({ error: (error as Error).message });
+					returnData.push({ json: { error: (error as Error).message } });
 				} else {
 					throw error;
 				}
 			}
 		}
 
-		return [this.helpers.returnJsonArray(returnData)];
+		return [returnData];
 	}
 }
