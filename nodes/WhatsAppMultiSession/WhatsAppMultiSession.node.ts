@@ -158,6 +158,12 @@ export class WhatsAppMultiSession implements INodeType {
 						description: 'Reply to a specific message',
 						action: 'Reply to a message',
 					},
+					{
+						name: 'Download Image',
+						value: 'downloadImage',
+						description: 'Download an image from a received message',
+						action: 'Download an image',
+					},
 				],
 				default: 'sendText',
 			},
@@ -494,6 +500,49 @@ export class WhatsAppMultiSession implements INodeType {
 				description: 'ID of the message to reply to (from webhook trigger data: {{$json.id}}). Must be from the same session.',
 			},
 
+			// Download Image fields
+			{
+				displayName: 'Media URL',
+				name: 'mediaUrl',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['downloadImage'],
+					},
+				},
+				default: '',
+				placeholder: '/api/media/temp/filename.jpg?expires=1234567890',
+				description: 'Media URL from webhook trigger data ({{$json.media_url}}). This should be the temporary media URL.',
+			},
+
+			{
+				displayName: 'Output Format',
+				name: 'outputFormat',
+				type: 'options',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+						operation: ['downloadImage'],
+					},
+				},
+				options: [
+					{
+						name: 'Base64',
+						value: 'base64',
+						description: 'Return image as base64 encoded string',
+					},
+					{
+						name: 'Binary',
+						value: 'binary',
+						description: 'Return image as binary data buffer',
+					},
+				],
+				default: 'base64',
+				description: 'Format for the downloaded image data',
+			},
+
 			// Contact check field
 			{
 				displayName: 'Phone Number',
@@ -726,6 +775,59 @@ export class WhatsAppMultiSession implements INodeType {
 							json: true,
 						});
 						returnData.push(response);
+
+					} else if (operation === 'downloadImage') {
+						const mediaUrl = this.getNodeParameter('mediaUrl', i) as string;
+						const outputFormat = this.getNodeParameter('outputFormat', i, 'base64') as string;
+
+						// Construct full URL if mediaUrl is relative
+						const fullMediaUrl = mediaUrl.startsWith('http') ? mediaUrl : `${baseUrl}${mediaUrl}`;
+
+						try {
+							// Download the image with authentication
+							const response = await this.helpers.request({
+								method: 'GET',
+								url: fullMediaUrl,
+								headers: {
+									'Authorization': `Bearer ${credentials.apiKey as string}`,
+								},
+								encoding: null, // This ensures binary data is returned as Buffer
+							});
+
+							// Determine content type from URL or default
+							const ext = mediaUrl.split('.').pop()?.toLowerCase();
+							let mimeType = 'application/octet-stream';
+							if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
+							else if (ext === 'png') mimeType = 'image/png';
+							else if (ext === 'gif') mimeType = 'image/gif';
+							else if (ext === 'pdf') mimeType = 'application/pdf';
+							else if (ext === 'mp4') mimeType = 'video/mp4';
+
+							if (outputFormat === 'base64') {
+								// Return as base64
+								const base64Data = Buffer.from(response).toString('base64');
+								returnData.push({
+									success: true,
+									message: 'Image downloaded successfully',
+									data: base64Data,
+									size: response.length,
+									mimeType: mimeType,
+									format: 'base64',
+								});
+							} else {
+								// Return as binary buffer
+								returnData.push({
+									success: true,
+									message: 'Image downloaded successfully',
+									data: response,
+									size: response.length,
+									mimeType: mimeType,
+									format: 'binary',
+								});
+							}
+						} catch (downloadError) {
+							throw new Error(`Failed to download image: ${(downloadError as Error).message}`);
+						}
 					}
 
 				} else if (resource === 'contact') {

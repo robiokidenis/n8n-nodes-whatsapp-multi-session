@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-whatsapp-multi-session",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "n8n node for WhatsApp Multi-Session API integration",
   "keywords": [
     "n8n-community-node-package",
@@ -52,6 +52,7 @@
     ]
   },
   "devDependencies": {
+    "@types/node": "^24.2.1",
     "@typescript-eslint/parser": "^5.45.0",
     "eslint": "^8.29.0",
     "eslint-plugin-n8n-nodes-base": "^1.11.0",
