@@ -584,7 +584,7 @@ class WhatsAppMultiSession {
         };
     }
     async execute() {
-        var _a;
+        var _a, _b, _c;
         const items = this.getInputData();
         const returnData = [];
         const credentials = await this.getCredentials('whatsAppMultiSessionApi');
@@ -776,14 +776,69 @@ class WhatsAppMultiSession {
                                 headers: {
                                     'Authorization': `Bearer ${credentials.apiKey}`,
                                 },
-                                encoding: null, // This ensures binary data is returned as Buffer
+                                encoding: null,
+                                resolveWithFullResponse: true,
+                                simple: false, // Don't throw on HTTP error status codes
                             });
+                            // Handle HTTP error responses
+                            if (response.statusCode !== 200) {
+                                let errorMessage = `HTTP ${response.statusCode}`;
+                                let errorDetails = '';
+                                // Try to parse error response body
+                                try {
+                                    const errorBody = ((_a = response.body) === null || _a === void 0 ? void 0 : _a.toString()) || '';
+                                    // Try to parse as JSON first
+                                    try {
+                                        const errorJson = JSON.parse(errorBody);
+                                        errorMessage = errorJson.message || errorJson.error || errorMessage;
+                                        errorDetails = errorJson.details || '';
+                                    }
+                                    catch (jsonError) {
+                                        // If not JSON, use plain text
+                                        errorMessage = errorBody.trim() || errorMessage;
+                                    }
+                                }
+                                catch (parseError) {
+                                    // If can't parse body, use status message
+                                    errorMessage = response.statusMessage || errorMessage;
+                                }
+                                // Handle specific error cases
+                                if (response.statusCode === 410) {
+                                    errorMessage = 'Media link has expired';
+                                    errorDetails = 'The temporary media URL has expired. Please request a new media URL from the webhook.';
+                                }
+                                else if (response.statusCode === 404) {
+                                    errorMessage = 'Media file not found';
+                                    errorDetails = 'The requested media file could not be found on the server.';
+                                }
+                                else if (response.statusCode === 401) {
+                                    errorMessage = 'Authentication failed';
+                                    errorDetails = 'Invalid API key or insufficient permissions.';
+                                }
+                                else if (response.statusCode === 403) {
+                                    errorMessage = 'Access forbidden';
+                                    errorDetails = 'Access to the media file is forbidden.';
+                                }
+                                // Return structured error response instead of throwing
+                                returnData.push({
+                                    json: {
+                                        success: false,
+                                        error: true,
+                                        errorCode: response.statusCode,
+                                        errorMessage: errorMessage,
+                                        errorDetails: errorDetails,
+                                        mediaUrl: mediaUrl,
+                                        format: outputFormat,
+                                    }
+                                });
+                                continue; // Continue to next item instead of throwing
+                            }
                             // Extract filename from URL
                             const urlParts = mediaUrl.split('/');
                             const filenameWithParams = urlParts[urlParts.length - 1];
                             const filename = filenameWithParams.split('?')[0]; // Remove query parameters
                             // Determine content type from URL or default
-                            const ext = (_a = filename.split('.').pop()) === null || _a === void 0 ? void 0 : _a.toLowerCase();
+                            const ext = (_b = filename.split('.').pop()) === null || _b === void 0 ? void 0 : _b.toLowerCase();
                             let mimeType = 'application/octet-stream';
                             if (ext === 'jpg' || ext === 'jpeg')
                                 mimeType = 'image/jpeg';
@@ -799,15 +854,16 @@ class WhatsAppMultiSession {
                                 mimeType = 'audio/mpeg';
                             else if (ext === 'ogg')
                                 mimeType = 'audio/ogg';
+                            const responseBody = response.body;
                             if (outputFormat === 'base64') {
                                 // Return as base64
-                                const base64Data = Buffer.from(response).toString('base64');
+                                const base64Data = Buffer.from(responseBody).toString('base64');
                                 returnData.push({
                                     json: {
                                         success: true,
                                         message: 'Image downloaded successfully',
                                         data: base64Data,
-                                        size: response.length,
+                                        size: responseBody.length,
                                         mimeType: mimeType,
                                         format: 'base64',
                                         filename: filename,
@@ -820,8 +876,8 @@ class WhatsAppMultiSession {
                                     json: {
                                         success: true,
                                         message: 'Image downloaded successfully',
-                                        data: response,
-                                        size: response.length,
+                                        data: responseBody,
+                                        size: responseBody.length,
                                         mimeType: mimeType,
                                         format: 'binary',
                                         filename: filename,
@@ -832,7 +888,7 @@ class WhatsAppMultiSession {
                                 // Return as n8n binary file attachment
                                 const outputFileField = this.getNodeParameter('outputFileField', i, 'data');
                                 const binaryData = {
-                                    data: Buffer.from(response).toString('base64'),
+                                    data: Buffer.from(responseBody).toString('base64'),
                                     mimeType: mimeType,
                                     fileName: filename,
                                     fileExtension: ext || '',
@@ -842,7 +898,7 @@ class WhatsAppMultiSession {
                                     json: {
                                         success: true,
                                         message: 'Image downloaded successfully',
-                                        size: response.length,
+                                        size: responseBody.length,
                                         mimeType: mimeType,
                                         format: 'file',
                                         filename: filename,
@@ -854,7 +910,38 @@ class WhatsAppMultiSession {
                             }
                         }
                         catch (downloadError) {
-                            throw new Error(`Failed to download image: ${downloadError.message}`);
+                            // Handle network errors and other exceptions
+                            const error = downloadError;
+                            let errorMessage = 'Network error or request failed';
+                            let errorDetails = error.message || '';
+                            // Try to extract more specific error information
+                            if (error.code) {
+                                errorMessage = `Network error: ${error.code}`;
+                            }
+                            else if ((_c = error.response) === null || _c === void 0 ? void 0 : _c.statusCode) {
+                                errorMessage = `HTTP ${error.response.statusCode}`;
+                                if (error.response.body) {
+                                    try {
+                                        const errorBody = error.response.body.toString();
+                                        const errorJson = JSON.parse(errorBody);
+                                        errorDetails = errorJson.message || errorJson.error || errorBody;
+                                    }
+                                    catch {
+                                        errorDetails = error.response.body.toString();
+                                    }
+                                }
+                            }
+                            // Return structured error response instead of throwing
+                            returnData.push({
+                                json: {
+                                    success: false,
+                                    error: true,
+                                    errorMessage: errorMessage,
+                                    errorDetails: errorDetails,
+                                    mediaUrl: mediaUrl,
+                                    format: outputFormat,
+                                }
+                            });
                         }
                     }
                 }
