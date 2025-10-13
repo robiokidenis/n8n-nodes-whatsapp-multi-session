@@ -606,7 +606,9 @@ class WhatsAppMultiSession {
                             headers: authHeaders,
                             json: true,
                         });
-                        response.sessions.forEach((session) => {
+                        // Handle both old format (response.sessions) and new format (response.data)
+                        const sessions = response.sessions || response.data || [];
+                        sessions.forEach((session) => {
                             returnData.push({ json: session });
                         });
                     }
@@ -954,7 +956,9 @@ class WhatsAppMultiSession {
                             headers: authHeaders,
                             json: true,
                         });
-                        response.contacts.forEach((contact) => {
+                        // Handle both old format (response.contacts) and new format (response.data)
+                        const contacts = response.contacts || response.data || [];
+                        contacts.forEach((contact) => {
                             returnData.push({ json: contact });
                         });
                     }

@@ -642,7 +642,9 @@ export class WhatsAppMultiSession implements INodeType {
 							headers: authHeaders,
 							json: true,
 						});
-						response.sessions.forEach((session: IDataObject) => {
+						// Handle both old format (response.sessions) and new format (response.data)
+						const sessions = response.sessions || response.data || [];
+						sessions.forEach((session: IDataObject) => {
 							returnData.push({ json: session });
 						});
 
@@ -990,7 +992,9 @@ export class WhatsAppMultiSession implements INodeType {
 							headers: authHeaders,
 							json: true,
 						});
-						response.contacts.forEach((contact: IDataObject) => {
+						// Handle both old format (response.contacts) and new format (response.data)
+						const contacts = response.contacts || response.data || [];
+						contacts.forEach((contact: IDataObject) => {
 							returnData.push({ json: contact });
 						});
 
