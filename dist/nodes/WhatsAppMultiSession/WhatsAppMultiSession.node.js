@@ -623,7 +623,9 @@ class WhatsAppMultiSession {
                             },
                             json: true,
                         });
-                        returnData.push({ json: response });
+                        // Handle both old format (direct response) and new format (response.data)
+                        const sessionData = response.data || response;
+                        returnData.push({ json: sessionData });
                     }
                     else if (operation === 'get') {
                         const sessionId = this.getNodeParameter('sessionId', i);
@@ -633,7 +635,9 @@ class WhatsAppMultiSession {
                             headers: authHeaders,
                             json: true,
                         });
-                        returnData.push({ json: response });
+                        // Handle both old format (direct response) and new format (response.data)
+                        const sessionData = response.data || response;
+                        returnData.push({ json: sessionData });
                     }
                     else if (operation === 'connect') {
                         const sessionId = this.getNodeParameter('sessionId', i);
