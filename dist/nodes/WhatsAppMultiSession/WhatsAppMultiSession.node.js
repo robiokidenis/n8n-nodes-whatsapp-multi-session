@@ -100,6 +100,12 @@ class WhatsAppMultiSession {
                             description: 'Delete a session',
                             action: 'Delete a session',
                         },
+                        {
+                            name: 'Check Status',
+                            value: 'checkStatus',
+                            description: 'Check if session is active and ready',
+                            action: 'Check session status',
+                        },
                     ],
                     default: 'list',
                 },
@@ -262,7 +268,7 @@ class WhatsAppMultiSession {
                     placeholder: 'session_123',
                     description: 'The WhatsApp session ID',
                 },
-                // Session ID field for session operations (get, connect, disconnect, delete)
+                // Session ID field for session operations (get, connect, disconnect, delete, checkStatus)
                 {
                     displayName: 'Session ID',
                     name: 'sessionId',
@@ -271,7 +277,7 @@ class WhatsAppMultiSession {
                     displayOptions: {
                         show: {
                             resource: ['session'],
-                            operation: ['get', 'connect', 'disconnect', 'delete'],
+                            operation: ['get', 'connect', 'disconnect', 'delete', 'checkStatus'],
                         },
                     },
                     default: '',
@@ -599,7 +605,7 @@ class WhatsAppMultiSession {
         };
     }
     async execute() {
-        var _a, _b, _c;
+        var _a, _b, _c, _d, _e;
         const items = this.getInputData();
         const returnData = [];
         const credentials = await this.getCredentials('whatsAppMultiSessionApi');
@@ -741,9 +747,42 @@ class WhatsAppMultiSession {
                 };
             }
         };
+        // Track processed requests to avoid duplicates
+        const processedRequests = new Set();
         for (let i = 0; i < items.length; i++) {
             const resource = this.getNodeParameter('resource', i);
             const operation = this.getNodeParameter('operation', i);
+            // Create a unique key for this request to prevent duplicates
+            let requestKey = '';
+            if (resource === 'message') {
+                const sessionId = this.getNodeParameter('sessionId', i);
+                const phoneNumber = this.getNodeParameter('phoneNumber', i);
+                if (operation === 'sendText') {
+                    const messageText = this.getNodeParameter('messageText', i);
+                    requestKey = `${resource}-${operation}-${sessionId}-${phoneNumber}-${messageText}`;
+                }
+                else if (operation === 'sendImage') {
+                    const imageUrl = this.getNodeParameter('imageUrl', i);
+                    const caption = this.getNodeParameter('caption', i, '');
+                    requestKey = `${resource}-${operation}-${sessionId}-${phoneNumber}-${imageUrl}-${caption}`;
+                }
+                else {
+                    requestKey = `${resource}-${operation}-${sessionId}-${phoneNumber}`;
+                }
+            }
+            else if (resource === 'session') {
+                const sessionId = this.getNodeParameter('sessionId', i);
+                requestKey = `${resource}-${operation}-${sessionId}`;
+            }
+            else {
+                const sessionId = this.getNodeParameter('sessionId', i);
+                requestKey = `${resource}-${operation}-${sessionId}`;
+            }
+            // Skip if this exact request has already been processed
+            if (processedRequests.has(requestKey)) {
+                continue;
+            }
+            processedRequests.add(requestKey);
             try {
                 if (resource === 'session') {
                     if (operation === 'list') {
@@ -815,6 +854,142 @@ class WhatsAppMultiSession {
                             json: true,
                         });
                         returnData.push({ json: response });
+                    }
+                    else if (operation === 'checkStatus') {
+                        const sessionId = this.getNodeParameter('sessionId', i);
+                        try {
+                            const response = await this.helpers.request({
+                                method: 'GET',
+                                url: `${baseUrl}/api/sessions/${sessionId}`,
+                                headers: authHeaders,
+                                json: true,
+                                resolveWithFullResponse: true,
+                                simple: false,
+                            });
+                            if (response.statusCode === 200) {
+                                // Handle both old format (direct response) and new format (response.data)
+                                const sessionData = response.data || response;
+                                // Check if session is active based on common session status fields
+                                const isActive = (sessionData.status === 'connected' ||
+                                    sessionData.status === 'active' ||
+                                    sessionData.state === 'CONNECTED' ||
+                                    sessionData.state === 'READY' ||
+                                    sessionData.connected === true ||
+                                    sessionData.ready === true);
+                                const statusInfo = {
+                                    sessionId: sessionId,
+                                    isActive: isActive,
+                                    status: sessionData.status || sessionData.state || 'unknown',
+                                    connected: sessionData.connected || sessionData.ready || false,
+                                    phoneConnected: sessionData.phone_connected || false,
+                                    lastActivity: sessionData.last_activity || sessionData.lastActivity || null,
+                                    profilePicture: sessionData.profile_picture_url || sessionData.profilePicture || null,
+                                    pushname: sessionData.pushname || null,
+                                    wid: sessionData.wid || null,
+                                    me: sessionData.me || null,
+                                    rawSessionData: sessionData,
+                                };
+                                returnData.push({
+                                    json: {
+                                        success: true,
+                                        message: isActive ? 'Session is active and ready' : 'Session is not active',
+                                        ...statusInfo,
+                                    }
+                                });
+                            }
+                            else {
+                                // Handle error responses for non-200 status codes
+                                let errorMessage = `HTTP ${response.statusCode}`;
+                                let errorDetails = '';
+                                let errorType = 'SESSION_CHECK_ERROR';
+                                try {
+                                    const errorBody = ((_a = response.body) === null || _a === void 0 ? void 0 : _a.toString()) || '';
+                                    // Try to parse as JSON first
+                                    try {
+                                        const errorJson = JSON.parse(errorBody);
+                                        errorMessage = errorJson.message || errorJson.error || errorMessage;
+                                        errorDetails = errorJson.details || '';
+                                        errorType = errorJson.code || errorType;
+                                    }
+                                    catch (jsonError) {
+                                        // If not JSON, use plain text
+                                        errorMessage = errorBody.trim() || errorMessage;
+                                    }
+                                }
+                                catch (parseError) {
+                                    // If can't parse body, use status message
+                                    errorMessage = response.statusMessage || errorMessage;
+                                }
+                                // Handle specific error cases
+                                if (response.statusCode === 404) {
+                                    errorType = 'SESSION_NOT_FOUND';
+                                    errorMessage = 'Session not found';
+                                    errorDetails = `The session ID '${sessionId}' was not found. Please check the session ID and ensure the session exists.`;
+                                }
+                                else if (response.statusCode === 401) {
+                                    errorType = 'AUTHENTICATION_FAILED';
+                                    errorMessage = 'Authentication failed';
+                                    errorDetails = 'Invalid API key or insufficient permissions.';
+                                }
+                                else if (response.statusCode === 403) {
+                                    errorType = 'ACCESS_FORBIDDEN';
+                                    errorMessage = 'Access forbidden';
+                                    errorDetails = 'You do not have permission to access this session.';
+                                }
+                                returnData.push({
+                                    json: {
+                                        success: false,
+                                        error: true,
+                                        errorCode: response.statusCode,
+                                        errorType: errorType,
+                                        errorMessage: errorMessage,
+                                        errorDetails: errorDetails,
+                                        sessionId: sessionId,
+                                        isActive: false,
+                                        status: 'error',
+                                    }
+                                });
+                            }
+                        }
+                        catch (networkError) {
+                            // Handle network errors and other exceptions
+                            const error = networkError;
+                            let errorMessage = 'Network error or request failed';
+                            let errorDetails = error.message || '';
+                            let errorType = 'NETWORK_ERROR';
+                            // Try to extract more specific error information
+                            if (error.code) {
+                                errorType = 'NETWORK_ERROR';
+                                errorMessage = `Network error: ${error.code}`;
+                                errorDetails = errorDetails || error.code;
+                            }
+                            else if ((_b = error.response) === null || _b === void 0 ? void 0 : _b.statusCode) {
+                                errorMessage = `HTTP ${error.response.statusCode}`;
+                                errorType = 'HTTP_ERROR';
+                                if (error.response.body) {
+                                    try {
+                                        const errorBody = error.response.body.toString();
+                                        const errorJson = JSON.parse(errorBody);
+                                        errorDetails = errorJson.message || errorJson.error || errorBody;
+                                    }
+                                    catch {
+                                        errorDetails = error.response.body.toString();
+                                    }
+                                }
+                            }
+                            returnData.push({
+                                json: {
+                                    success: false,
+                                    error: true,
+                                    errorType: errorType,
+                                    errorMessage: errorMessage,
+                                    errorDetails: errorDetails,
+                                    sessionId: sessionId,
+                                    isActive: false,
+                                    status: 'error',
+                                }
+                            });
+                        }
                     }
                 }
                 else if (resource === 'message') {
@@ -903,7 +1078,7 @@ class WhatsAppMultiSession {
                                 let errorDetails = '';
                                 // Try to parse error response body
                                 try {
-                                    const errorBody = ((_a = response.body) === null || _a === void 0 ? void 0 : _a.toString()) || '';
+                                    const errorBody = ((_c = response.body) === null || _c === void 0 ? void 0 : _c.toString()) || '';
                                     // Try to parse as JSON first
                                     try {
                                         const errorJson = JSON.parse(errorBody);
@@ -955,7 +1130,7 @@ class WhatsAppMultiSession {
                             const filenameWithParams = urlParts[urlParts.length - 1];
                             const filename = filenameWithParams.split('?')[0]; // Remove query parameters
                             // Determine content type from URL or default
-                            const ext = (_b = filename.split('.').pop()) === null || _b === void 0 ? void 0 : _b.toLowerCase();
+                            const ext = (_d = filename.split('.').pop()) === null || _d === void 0 ? void 0 : _d.toLowerCase();
                             let mimeType = 'application/octet-stream';
                             if (ext === 'jpg' || ext === 'jpeg')
                                 mimeType = 'image/jpeg';
@@ -1035,7 +1210,7 @@ class WhatsAppMultiSession {
                             if (error.code) {
                                 errorMessage = `Network error: ${error.code}`;
                             }
-                            else if ((_c = error.response) === null || _c === void 0 ? void 0 : _c.statusCode) {
+                            else if ((_e = error.response) === null || _e === void 0 ? void 0 : _e.statusCode) {
                                 errorMessage = `HTTP ${error.response.statusCode}`;
                                 if (error.response.body) {
                                     try {
