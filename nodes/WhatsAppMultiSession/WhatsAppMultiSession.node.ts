@@ -266,9 +266,24 @@ export class WhatsAppMultiSession implements INodeType {
 				type: 'string',
 				required: true,
 				displayOptions: {
-					hide: {
+					show: {
+						resource: ['message', 'contact', 'typing', 'webhook'],
+					},
+				},
+				default: '',
+				placeholder: 'session_123',
+				description: 'The WhatsApp session ID',
+			},
+			// Session ID field for session operations (get, connect, disconnect, delete)
+			{
+				displayName: 'Session ID',
+				name: 'sessionId',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
 						resource: ['session'],
-						operation: ['list'],
+						operation: ['get', 'connect', 'disconnect', 'delete'],
 					},
 				},
 				default: '',
