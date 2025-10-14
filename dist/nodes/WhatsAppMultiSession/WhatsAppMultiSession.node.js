@@ -609,6 +609,138 @@ class WhatsAppMultiSession {
             'Authorization': `Bearer ${credentials.apiKey}`,
             'Content-Type': 'application/json',
         };
+        // Helper function for handling message sending with proper error handling
+        const handleMessageSending = async (url, body, sessionId, operationType) => {
+            var _a, _b;
+            try {
+                const response = await this.helpers.request({
+                    method: 'POST',
+                    url: url,
+                    headers: authHeaders,
+                    body: body,
+                    json: true,
+                    resolveWithFullResponse: true,
+                    simple: false,
+                });
+                // Handle successful response
+                if (response.statusCode === 200 || response.statusCode === 201) {
+                    return {
+                        success: true,
+                        message: `${operationType} sent successfully`,
+                        sessionId: sessionId,
+                        operation: operationType,
+                        ...response.body,
+                    };
+                }
+                // Handle error responses
+                let errorMessage = `HTTP ${response.statusCode}`;
+                let errorDetails = '';
+                let errorType = 'UNKNOWN_ERROR';
+                try {
+                    const errorBody = ((_a = response.body) === null || _a === void 0 ? void 0 : _a.toString()) || '';
+                    // Try to parse as JSON first
+                    try {
+                        const errorJson = JSON.parse(errorBody);
+                        errorMessage = errorJson.message || errorJson.error || errorMessage;
+                        errorDetails = errorJson.details || '';
+                        errorType = errorJson.code || errorType;
+                    }
+                    catch (jsonError) {
+                        // If not JSON, use plain text
+                        errorMessage = errorBody.trim() || errorMessage;
+                    }
+                }
+                catch (parseError) {
+                    // If can't parse body, use status message
+                    errorMessage = response.statusMessage || errorMessage;
+                }
+                // Handle specific error cases for message sending
+                if (response.statusCode === 403) {
+                    errorType = 'SESSION_DISABLED';
+                    errorMessage = 'Session is disabled or cannot perform operations';
+                    errorDetails = errorDetails || 'The WhatsApp session may be disconnected, disabled, or not properly initialized. Please check the session status and try reconnecting.';
+                }
+                else if (response.statusCode === 400) {
+                    errorType = 'BAD_REQUEST';
+                    errorMessage = 'Bad request for message sending';
+                    errorDetails = errorDetails || 'Check the message parameters and recipient phone number format.';
+                }
+                else if (response.statusCode === 401) {
+                    errorType = 'AUTHENTICATION_FAILED';
+                    errorMessage = 'Authentication failed';
+                    errorDetails = errorDetails || 'Invalid API key or insufficient permissions.';
+                }
+                else if (response.statusCode === 404) {
+                    errorType = 'SESSION_NOT_FOUND';
+                    errorMessage = 'Session not found';
+                    errorDetails = errorDetails || `The session ID '${sessionId}' was not found. Please check the session ID and ensure the session exists.`;
+                }
+                else if (response.statusCode === 429) {
+                    errorType = 'RATE_LIMITED';
+                    errorMessage = 'Rate limit exceeded';
+                    errorDetails = errorDetails || 'Too many messages sent too quickly. Please wait before sending more messages.';
+                }
+                else if (response.statusCode === 500) {
+                    errorType = 'SERVER_ERROR';
+                    errorMessage = 'Internal server error';
+                    errorDetails = errorDetails || 'The WhatsApp API encountered an error. Please try again later.';
+                }
+                else if (response.statusCode === 503) {
+                    errorType = 'SERVICE_UNAVAILABLE';
+                    errorMessage = 'Service unavailable';
+                    errorDetails = errorDetails || 'The WhatsApp service is temporarily unavailable. Please try again later.';
+                }
+                // Return structured error response
+                return {
+                    success: false,
+                    error: true,
+                    errorCode: response.statusCode,
+                    errorType: errorType,
+                    errorMessage: errorMessage,
+                    errorDetails: errorDetails,
+                    sessionId: sessionId,
+                    operation: operationType,
+                    requestBody: body,
+                };
+            }
+            catch (networkError) {
+                // Handle network errors and other exceptions
+                const error = networkError;
+                let errorMessage = 'Network error or request failed';
+                let errorDetails = error.message || '';
+                let errorType = 'NETWORK_ERROR';
+                // Try to extract more specific error information
+                if (error.code) {
+                    errorType = 'NETWORK_ERROR';
+                    errorMessage = `Network error: ${error.code}`;
+                    errorDetails = errorDetails || error.code;
+                }
+                else if ((_b = error.response) === null || _b === void 0 ? void 0 : _b.statusCode) {
+                    errorMessage = `HTTP ${error.response.statusCode}`;
+                    errorType = 'HTTP_ERROR';
+                    if (error.response.body) {
+                        try {
+                            const errorBody = error.response.body.toString();
+                            const errorJson = JSON.parse(errorBody);
+                            errorDetails = errorJson.message || errorJson.error || errorBody;
+                        }
+                        catch {
+                            errorDetails = error.response.body.toString();
+                        }
+                    }
+                }
+                return {
+                    success: false,
+                    error: true,
+                    errorType: errorType,
+                    errorMessage: errorMessage,
+                    errorDetails: errorDetails,
+                    sessionId: sessionId,
+                    operation: operationType,
+                    requestBody: body,
+                };
+            }
+        };
         for (let i = 0; i < items.length; i++) {
             const resource = this.getNodeParameter('resource', i);
             const operation = this.getNodeParameter('operation', i);
@@ -690,99 +822,63 @@ class WhatsAppMultiSession {
                     const phoneNumber = this.getNodeParameter('phoneNumber', i);
                     if (operation === 'sendText') {
                         const messageText = this.getNodeParameter('messageText', i);
-                        const response = await this.helpers.request({
-                            method: 'POST',
-                            url: `${baseUrl}/api/sessions/${sessionId}/send`,
-                            headers: authHeaders,
-                            body: {
-                                to: phoneNumber,
-                                message: messageText,
-                            },
-                            json: true,
-                        });
-                        returnData.push({ json: response });
+                        const result = await handleMessageSending(`${baseUrl}/api/sessions/${sessionId}/send`, {
+                            to: phoneNumber,
+                            message: messageText,
+                        }, sessionId, 'Text message');
+                        returnData.push({ json: result });
                     }
                     else if (operation === 'sendImage') {
                         const imageUrl = this.getNodeParameter('imageUrl', i);
                         const caption = this.getNodeParameter('caption', i, '');
-                        const response = await this.helpers.request({
-                            method: 'POST',
-                            url: `${baseUrl}/api/sessions/${sessionId}/send-image`,
-                            headers: authHeaders,
-                            body: {
-                                to: phoneNumber,
-                                image_url: imageUrl,
-                                caption: caption,
-                            },
-                            json: true,
-                        });
-                        returnData.push({ json: response });
+                        const result = await handleMessageSending(`${baseUrl}/api/sessions/${sessionId}/send-image`, {
+                            to: phoneNumber,
+                            image_url: imageUrl,
+                            caption: caption,
+                        }, sessionId, 'Image message');
+                        returnData.push({ json: result });
                     }
                     else if (operation === 'sendDocument') {
                         const documentUrl = this.getNodeParameter('documentUrl', i);
                         const filename = this.getNodeParameter('filename', i, '');
-                        const response = await this.helpers.request({
-                            method: 'POST',
-                            url: `${baseUrl}/api/sessions/${sessionId}/send-document`,
-                            headers: authHeaders,
-                            body: {
-                                to: phoneNumber,
-                                document_url: documentUrl,
-                                filename: filename,
-                            },
-                            json: true,
-                        });
-                        returnData.push({ json: response });
+                        const result = await handleMessageSending(`${baseUrl}/api/sessions/${sessionId}/send-document`, {
+                            to: phoneNumber,
+                            document_url: documentUrl,
+                            filename: filename,
+                        }, sessionId, 'Document');
+                        returnData.push({ json: result });
                     }
                     else if (operation === 'sendLocation') {
                         const latitude = this.getNodeParameter('latitude', i);
                         const longitude = this.getNodeParameter('longitude', i);
                         const locationName = this.getNodeParameter('locationName', i, '');
-                        const response = await this.helpers.request({
-                            method: 'POST',
-                            url: `${baseUrl}/api/sessions/${sessionId}/send-location`,
-                            headers: authHeaders,
-                            body: {
-                                to: phoneNumber,
-                                latitude: latitude,
-                                longitude: longitude,
-                                name: locationName,
-                            },
-                            json: true,
-                        });
-                        returnData.push({ json: response });
+                        const result = await handleMessageSending(`${baseUrl}/api/sessions/${sessionId}/send-location`, {
+                            to: phoneNumber,
+                            latitude: latitude,
+                            longitude: longitude,
+                            name: locationName,
+                        }, sessionId, 'Location');
+                        returnData.push({ json: result });
                     }
                     else if (operation === 'forwardMessage') {
                         const forwardMessageId = this.getNodeParameter('forwardMessageId', i);
                         const forwardMessageText = this.getNodeParameter('forwardMessageText', i);
-                        const response = await this.helpers.request({
-                            method: 'POST',
-                            url: `${baseUrl}/api/sessions/${sessionId}/forward`,
-                            headers: authHeaders,
-                            body: {
-                                to: phoneNumber,
-                                message_id: forwardMessageId,
-                                text: forwardMessageText,
-                            },
-                            json: true,
-                        });
-                        returnData.push({ json: response });
+                        const result = await handleMessageSending(`${baseUrl}/api/sessions/${sessionId}/forward`, {
+                            to: phoneNumber,
+                            message_id: forwardMessageId,
+                            text: forwardMessageText,
+                        }, sessionId, 'Forwarded message');
+                        returnData.push({ json: result });
                     }
                     else if (operation === 'replyMessage') {
                         const replyText = this.getNodeParameter('replyText', i);
                         const quotedMessageId = this.getNodeParameter('quotedMessageId', i);
-                        const response = await this.helpers.request({
-                            method: 'POST',
-                            url: `${baseUrl}/api/sessions/${sessionId}/reply`,
-                            headers: authHeaders,
-                            body: {
-                                to: phoneNumber,
-                                message: replyText,
-                                quoted_message_id: quotedMessageId,
-                            },
-                            json: true,
-                        });
-                        returnData.push({ json: response });
+                        const result = await handleMessageSending(`${baseUrl}/api/sessions/${sessionId}/reply`, {
+                            to: phoneNumber,
+                            message: replyText,
+                            quoted_message_id: quotedMessageId,
+                        }, sessionId, 'Reply message');
+                        returnData.push({ json: result });
                     }
                     else if (operation === 'downloadImage') {
                         const mediaUrl = this.getNodeParameter('mediaUrl', i);
