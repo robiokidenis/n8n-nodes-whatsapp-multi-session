@@ -771,8 +771,15 @@ class WhatsAppMultiSession {
                 }
             }
             else if (resource === 'session') {
-                const sessionId = this.getNodeParameter('sessionId', i);
-                requestKey = `${resource}-${operation}-${sessionId}`;
+                // For session operations, only include sessionId if the operation requires it
+                if (['get', 'connect', 'disconnect', 'delete', 'checkStatus'].includes(operation)) {
+                    const sessionId = this.getNodeParameter('sessionId', i);
+                    requestKey = `${resource}-${operation}-${sessionId}`;
+                }
+                else {
+                    // For operations like 'list' and 'create' that don't need sessionId
+                    requestKey = `${resource}-${operation}`;
+                }
             }
             else {
                 const sessionId = this.getNodeParameter('sessionId', i);

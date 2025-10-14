@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-whatsapp-multi-session",
-  "version": "1.4.8",
+  "version": "1.4.9",
   "description": "n8n node for WhatsApp Multi-Session API integration",
   "keywords": [
     "n8n-community-node-package",
