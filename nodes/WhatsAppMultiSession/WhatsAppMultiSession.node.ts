@@ -1055,54 +1055,158 @@ export class WhatsAppMultiSession implements INodeType {
 					} else if (operation === 'login') {
 						// Initiate login for a session (triggers QR code generation)
 						const sessionId = this.getNodeParameter('sessionId', i) as string;
-						const response = await this.helpers.request({
-							method: 'POST',
-							url: `${baseUrl}/api/sessions/${sessionId}/login`,
-							headers: authHeaders,
-							json: true,
-						});
-						returnData.push({
-							json: {
-								success: true,
-								message: 'Login initiated successfully. Next step: Use the "Get QR Code" operation to retrieve the QR code image, then scan it with WhatsApp on your phone.',
-								instructions: '1. Add a "Get QR Code" node after this one\n2. Use the same Session ID\n3. The QR code will be returned as qrCodeDataUrl (base64 image)\n4. Scan the QR code with WhatsApp (Linked Devices > Link a Device)',
-								nextOperation: 'getQrCode',
-								sessionId: sessionId,
-								...response,
-							}
-						});
 
+						try {
+							const response = await this.helpers.request({
+								method: 'POST',
+								url: `${baseUrl}/api/sessions/${sessionId}/login`,
+								headers: authHeaders,
+								json: true,
+								resolveWithFullResponse: true,
+								simple: false,
+							});
+
+							if (response.statusCode !== 200) {
+								let errorMessage = `HTTP ${response.statusCode}`;
+								let errorDetails = '';
+
+								try {
+									const errorBody = response.body?.toString() || '';
+									const errorJson = JSON.parse(errorBody);
+									errorMessage = errorJson.message || errorJson.error || errorMessage;
+									errorDetails = errorJson.details || '';
+								} catch {
+									errorMessage = response.statusMessage || errorMessage;
+								}
+
+								// Provide helpful error messages
+								if (errorMessage.includes('already logged in')) {
+									errorDetails = 'This session is already authenticated. You can skip the login process and start sending messages.';
+								} else if (errorMessage.includes('not found')) {
+									errorDetails = `Session ID '${sessionId}' not found. Please check the Session ID or use "Create" operation first.`;
+								} else if (errorMessage.includes('disabled')) {
+									errorDetails = 'This session is disabled. Enable it in the web interface before attempting to login.';
+								}
+
+								returnData.push({
+									json: {
+										success: false,
+										error: true,
+										errorCode: response.statusCode,
+										errorMessage: errorMessage,
+										errorDetails: errorDetails,
+										sessionId: sessionId,
+									}
+								});
+								continue;
+							}
+
+							returnData.push({
+								json: {
+									success: true,
+									message: 'Login initiated successfully. Next step: Use the "Get QR Code" operation to retrieve the QR code image, then scan it with WhatsApp on your phone.',
+									instructions: '1. Add a "Get QR Code" node after this one\n2. Use the same Session ID\n3. The QR code will be returned as qrCodeDataUrl (base64 image)\n4. Scan the QR code with WhatsApp (Linked Devices > Link a Device)',
+									nextOperation: 'getQrCode',
+									sessionId: sessionId,
+									note: 'Call Get QR Code immediately after Login to retrieve the QR code before it expires',
+								}
+							});
+						} catch (networkError) {
+							const error = networkError as any;
+							let errorMessage = 'Network error or request failed';
+							let errorDetails = error.message || '';
+
+							returnData.push({
+								json: {
+									success: false,
+									error: true,
+									errorMessage: errorMessage,
+									errorDetails: errorDetails,
+									sessionId: sessionId,
+								}
+							});
+						}
 					} else if (operation === 'getQrCode') {
 						// Get QR code for a session (viewable as both raw data and image)
 						const sessionId = this.getNodeParameter('sessionId', i) as string;
-						const response = await this.helpers.request({
-							method: 'GET',
-							url: `${baseUrl}/api/sessions/${sessionId}/qr`,
-							headers: authHeaders,
-							json: true,
-						});
 
-						// Extract QR code from response (handle both old and new response formats)
-						const qrCode = response.data?.qr_code || response.qr_code || response.qrCode;
+						try {
+							const response = await this.helpers.request({
+								method: 'GET',
+								url: `${baseUrl}/api/sessions/${sessionId}/qr`,
+								headers: authHeaders,
+								json: true,
+								resolveWithFullResponse: true,
+								simple: false,
+							});
 
-						// Return QR code in multiple formats for flexibility
-						// - qrCodeRaw: Base64 string without the data URL prefix (for custom processing)
-						// - qrCodeDataUrl: Full data URL (for direct display as image)
-						// - qrCodeImage: Same as qrCodeDataUrl (alias for convenience)
-						returnData.push({
-							json: {
-								success: true,
-								message: 'QR code retrieved successfully. Open the qrCodeDataUrl in a browser or use it in an HTML image tag: <img src="{{qrCodeDataUrl}}" />',
-								instructions: 'To view the QR code:\n1. Use qrCodeDataUrl in an HTML img tag: <img src="{{$json.qrCodeDataUrl}}" />\n2. Or decode qrCodeRaw from base64 and save as .png file\n3. Scan with WhatsApp: Settings > Linked Devices > Link a Device',
-								sessionId: sessionId,
-								qrCodeRaw: qrCode?.replace(/^data:image\/png;base64,/, '') || '', // Raw base64 (before image format)
-								qrCodeDataUrl: qrCode || '', // Data URL format (after image format) - use this in <img src="...">
-								qrCodeImage: qrCode || '', // Alias for qrCodeDataUrl
-								mimeType: 'image/png',
-								format: 'base64',
-								...response,
+							// Handle error responses
+							if (response.statusCode !== 200) {
+								let errorMessage = `HTTP ${response.statusCode}`;
+								let errorDetails = '';
+
+								try {
+									const errorBody = response.body?.toString() || '';
+									errorMessage = errorBody.trim() || errorMessage;
+								} catch (parseError) {
+									errorMessage = response.statusMessage || errorMessage;
+								}
+
+								// Provide helpful error message for timeout
+								if (errorMessage.includes('timeout')) {
+									errorDetails = 'QR code generation timed out. Make sure you called "Login" operation first. If you did, the QR code may have already been consumed. Try calling "Login" again, then immediately call "Get QR Code".';
+								} else if (errorMessage.includes('already logged in')) {
+									errorDetails = 'This session is already authenticated. You can skip the QR code step and start sending messages.';
+								} else if (errorMessage.includes('not found')) {
+									errorDetails = `Session ID '${sessionId}' not found. Please check the Session ID or use "Create" operation first.`;
+								}
+
+								returnData.push({
+									json: {
+										success: false,
+										error: true,
+										errorCode: response.statusCode,
+										errorMessage: errorMessage,
+										errorDetails: errorDetails,
+										sessionId: sessionId,
+									}
+								});
+								continue;
 							}
-						});
+
+							// Extract QR code from response (handle both old and new response formats)
+							const qrCode = response.body?.data?.qr_code || response.body?.qr_code || response.body?.qrCode;
+
+							// Return QR code in multiple formats for flexibility
+							returnData.push({
+								json: {
+									success: true,
+									message: 'QR code retrieved successfully. Open the qrCodeDataUrl in a browser or use it in an HTML image tag: <img src="{{qrCodeDataUrl}}" />',
+									instructions: 'To view the QR code:\n1. Use qrCodeDataUrl in an HTML img tag: <img src="{{$json.qrCodeDataUrl}}" />\n2. Or decode qrCodeRaw from base64 and save as .png file\n3. Scan with WhatsApp: Settings > Linked Devices > Link a Device',
+									sessionId: sessionId,
+									qrCodeRaw: qrCode?.replace(/^data:image\/png;base64,/, '') || '', // Raw base64 (before image format)
+									qrCodeDataUrl: qrCode || '', // Data URL format (after image format) - use this in <img src="...">
+									qrCodeImage: qrCode || '', // Alias for qrCodeDataUrl
+									mimeType: 'image/png',
+									format: 'base64',
+								}
+							});
+						} catch (networkError) {
+							// Handle network errors
+							const error = networkError as any;
+							let errorMessage = 'Network error or request failed';
+							let errorDetails = error.message || '';
+
+							returnData.push({
+								json: {
+									success: false,
+									error: true,
+									errorMessage: errorMessage,
+									errorDetails: errorDetails,
+									sessionId: sessionId,
+								}
+							});
+						}
 					}
 
 				} else if (resource === 'message') {
