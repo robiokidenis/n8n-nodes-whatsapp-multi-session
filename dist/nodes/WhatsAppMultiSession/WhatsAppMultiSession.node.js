@@ -83,6 +83,18 @@ class WhatsAppMultiSession {
                             action: 'List sessions',
                         },
                         {
+                            name: 'Login',
+                            value: 'login',
+                            description: 'Initiate login and get QR code',
+                            action: 'Login to session',
+                        },
+                        {
+                            name: 'Get QR Code',
+                            value: 'getQrCode',
+                            description: 'Get QR code for session authentication',
+                            action: 'Get QR code',
+                        },
+                        {
                             name: 'Connect',
                             value: 'connect',
                             description: 'Connect a session (get QR code)',
@@ -268,7 +280,7 @@ class WhatsAppMultiSession {
                     placeholder: 'session_123',
                     description: 'The WhatsApp session ID',
                 },
-                // Session ID field for session operations (get, connect, disconnect, delete, checkStatus)
+                // Session ID field for session operations (get, login, getQrCode, connect, disconnect, delete, checkStatus)
                 {
                     displayName: 'Session ID',
                     name: 'sessionId',
@@ -277,7 +289,7 @@ class WhatsAppMultiSession {
                     displayOptions: {
                         show: {
                             resource: ['session'],
-                            operation: ['get', 'connect', 'disconnect', 'delete', 'checkStatus'],
+                            operation: ['get', 'login', 'getQrCode', 'connect', 'disconnect', 'delete', 'checkStatus'],
                         },
                     },
                     default: '',
@@ -605,7 +617,7 @@ class WhatsAppMultiSession {
         };
     }
     async execute() {
-        var _a, _b, _c, _d, _e;
+        var _a, _b, _c, _d, _e, _f;
         const items = this.getInputData();
         const returnData = [];
         const credentials = await this.getCredentials('whatsAppMultiSessionApi');
@@ -772,7 +784,7 @@ class WhatsAppMultiSession {
             }
             else if (resource === 'session') {
                 // For session operations, only include sessionId if the operation requires it
-                if (['get', 'connect', 'disconnect', 'delete', 'checkStatus'].includes(operation)) {
+                if (['get', 'login', 'getQrCode', 'connect', 'disconnect', 'delete', 'checkStatus'].includes(operation)) {
                     const sessionId = this.getNodeParameter('sessionId', i);
                     requestKey = `${resource}-${operation}-${sessionId}`;
                 }
@@ -998,6 +1010,53 @@ class WhatsAppMultiSession {
                             });
                         }
                     }
+                    else if (operation === 'login') {
+                        // Initiate login for a session (triggers QR code generation)
+                        const sessionId = this.getNodeParameter('sessionId', i);
+                        const response = await this.helpers.request({
+                            method: 'POST',
+                            url: `${baseUrl}/api/sessions/${sessionId}/login`,
+                            headers: authHeaders,
+                            json: true,
+                        });
+                        returnData.push({
+                            json: {
+                                success: true,
+                                message: 'Login initiated successfully. Use Get QR Code operation to retrieve the QR code.',
+                                sessionId: sessionId,
+                                ...response,
+                            }
+                        });
+                    }
+                    else if (operation === 'getQrCode') {
+                        // Get QR code for a session (viewable as both raw data and image)
+                        const sessionId = this.getNodeParameter('sessionId', i);
+                        const response = await this.helpers.request({
+                            method: 'GET',
+                            url: `${baseUrl}/api/sessions/${sessionId}/qr`,
+                            headers: authHeaders,
+                            json: true,
+                        });
+                        // Extract QR code from response (handle both old and new response formats)
+                        const qrCode = ((_c = response.data) === null || _c === void 0 ? void 0 : _c.qr_code) || response.qr_code || response.qrCode;
+                        // Return QR code in multiple formats for flexibility
+                        // - qrCodeRaw: Base64 string without the data URL prefix (for custom processing)
+                        // - qrCodeDataUrl: Full data URL (for direct display as image)
+                        // - qrCodeImage: Same as qrCodeDataUrl (alias for convenience)
+                        returnData.push({
+                            json: {
+                                success: true,
+                                message: 'QR code retrieved successfully',
+                                sessionId: sessionId,
+                                qrCodeRaw: (qrCode === null || qrCode === void 0 ? void 0 : qrCode.replace(/^data:image\/png;base64,/, '')) || '',
+                                qrCodeDataUrl: qrCode || '',
+                                qrCodeImage: qrCode || '',
+                                mimeType: 'image/png',
+                                format: 'base64',
+                                ...response,
+                            }
+                        });
+                    }
                 }
                 else if (resource === 'message') {
                     const sessionId = this.getNodeParameter('sessionId', i);
@@ -1085,7 +1144,7 @@ class WhatsAppMultiSession {
                                 let errorDetails = '';
                                 // Try to parse error response body
                                 try {
-                                    const errorBody = ((_c = response.body) === null || _c === void 0 ? void 0 : _c.toString()) || '';
+                                    const errorBody = ((_d = response.body) === null || _d === void 0 ? void 0 : _d.toString()) || '';
                                     // Try to parse as JSON first
                                     try {
                                         const errorJson = JSON.parse(errorBody);
@@ -1137,7 +1196,7 @@ class WhatsAppMultiSession {
                             const filenameWithParams = urlParts[urlParts.length - 1];
                             const filename = filenameWithParams.split('?')[0]; // Remove query parameters
                             // Determine content type from URL or default
-                            const ext = (_d = filename.split('.').pop()) === null || _d === void 0 ? void 0 : _d.toLowerCase();
+                            const ext = (_e = filename.split('.').pop()) === null || _e === void 0 ? void 0 : _e.toLowerCase();
                             let mimeType = 'application/octet-stream';
                             if (ext === 'jpg' || ext === 'jpeg')
                                 mimeType = 'image/jpeg';
@@ -1217,7 +1276,7 @@ class WhatsAppMultiSession {
                             if (error.code) {
                                 errorMessage = `Network error: ${error.code}`;
                             }
-                            else if ((_e = error.response) === null || _e === void 0 ? void 0 : _e.statusCode) {
+                            else if ((_f = error.response) === null || _f === void 0 ? void 0 : _f.statusCode) {
                                 errorMessage = `HTTP ${error.response.statusCode}`;
                                 if (error.response.body) {
                                     try {
