@@ -92,19 +92,19 @@ export class WhatsAppMultiSession implements INodeType {
 					{
 						name: 'Login',
 						value: 'login',
-						description: 'Initiate login and get QR code',
+						description: 'Initiate login process. Use "Get QR Code" operation afterwards to retrieve the QR code for scanning with WhatsApp',
 						action: 'Login to session',
 					},
 					{
 						name: 'Get QR Code',
 						value: 'getQrCode',
-						description: 'Get QR code for session authentication',
+						description: 'Get QR code for session authentication. Returns QR code as base64 image data URL. Scan with WhatsApp on your phone to authenticate',
 						action: 'Get QR code',
 					},
 					{
 						name: 'Connect',
 						value: 'connect',
-						description: 'Connect a session (get QR code)',
+						description: 'Connect a session (alias for Login). Use "Get QR Code" operation afterwards to retrieve the QR code',
 						action: 'Connect a session',
 					},
 					{
@@ -307,6 +307,7 @@ export class WhatsAppMultiSession implements INodeType {
 				default: '',
 				placeholder: 'session_123',
 				description: 'The WhatsApp session ID',
+				hint: 'Use "Create" operation first to get a session ID, or use "List" to see existing sessions',
 			},
 
 			// Session creation fields
@@ -1063,7 +1064,9 @@ export class WhatsAppMultiSession implements INodeType {
 						returnData.push({
 							json: {
 								success: true,
-								message: 'Login initiated successfully. Use Get QR Code operation to retrieve the QR code.',
+								message: 'Login initiated successfully. Next step: Use the "Get QR Code" operation to retrieve the QR code image, then scan it with WhatsApp on your phone.',
+								instructions: '1. Add a "Get QR Code" node after this one\n2. Use the same Session ID\n3. The QR code will be returned as qrCodeDataUrl (base64 image)\n4. Scan the QR code with WhatsApp (Linked Devices > Link a Device)',
+								nextOperation: 'getQrCode',
 								sessionId: sessionId,
 								...response,
 							}
@@ -1089,10 +1092,11 @@ export class WhatsAppMultiSession implements INodeType {
 						returnData.push({
 							json: {
 								success: true,
-								message: 'QR code retrieved successfully',
+								message: 'QR code retrieved successfully. Open the qrCodeDataUrl in a browser or use it in an HTML image tag: <img src="{{qrCodeDataUrl}}" />',
+								instructions: 'To view the QR code:\n1. Use qrCodeDataUrl in an HTML img tag: <img src="{{$json.qrCodeDataUrl}}" />\n2. Or decode qrCodeRaw from base64 and save as .png file\n3. Scan with WhatsApp: Settings > Linked Devices > Link a Device',
 								sessionId: sessionId,
 								qrCodeRaw: qrCode?.replace(/^data:image\/png;base64,/, '') || '', // Raw base64 (before image format)
-								qrCodeDataUrl: qrCode || '', // Data URL format (after image format)
+								qrCodeDataUrl: qrCode || '', // Data URL format (after image format) - use this in <img src="...">
 								qrCodeImage: qrCode || '', // Alias for qrCodeDataUrl
 								mimeType: 'image/png',
 								format: 'base64',
