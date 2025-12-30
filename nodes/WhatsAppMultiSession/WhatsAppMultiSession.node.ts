@@ -90,6 +90,18 @@ export class WhatsAppMultiSession implements INodeType {
 						action: 'List sessions',
 					},
 					{
+						name: 'Login',
+						value: 'login',
+						description: 'Initiate login and get QR code',
+						action: 'Login to session',
+					},
+					{
+						name: 'Get QR Code',
+						value: 'getQrCode',
+						description: 'Get QR code for session authentication',
+						action: 'Get QR code',
+					},
+					{
 						name: 'Connect',
 						value: 'connect',
 						description: 'Connect a session (get QR code)',
@@ -280,7 +292,7 @@ export class WhatsAppMultiSession implements INodeType {
 				placeholder: 'session_123',
 				description: 'The WhatsApp session ID',
 			},
-			// Session ID field for session operations (get, connect, disconnect, delete, checkStatus)
+			// Session ID field for session operations (get, login, getQrCode, connect, disconnect, delete, checkStatus)
 			{
 				displayName: 'Session ID',
 				name: 'sessionId',
@@ -289,7 +301,7 @@ export class WhatsAppMultiSession implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['session'],
-						operation: ['get', 'connect', 'disconnect', 'delete', 'checkStatus'],
+						operation: ['get', 'login', 'getQrCode', 'connect', 'disconnect', 'delete', 'checkStatus'],
 					},
 				},
 				default: '',
@@ -809,7 +821,7 @@ export class WhatsAppMultiSession implements INodeType {
 				}
 			} else if (resource === 'session') {
 				// For session operations, only include sessionId if the operation requires it
-				if (['get', 'connect', 'disconnect', 'delete', 'checkStatus'].includes(operation)) {
+				if (['get', 'login', 'getQrCode', 'connect', 'disconnect', 'delete', 'checkStatus'].includes(operation)) {
 					const sessionId = this.getNodeParameter('sessionId', i) as string;
 					requestKey = `${resource}-${operation}-${sessionId}`;
 				} else {
@@ -1039,6 +1051,54 @@ export class WhatsAppMultiSession implements INodeType {
 								}
 							});
 						}
+					} else if (operation === 'login') {
+						// Initiate login for a session (triggers QR code generation)
+						const sessionId = this.getNodeParameter('sessionId', i) as string;
+						const response = await this.helpers.request({
+							method: 'POST',
+							url: `${baseUrl}/api/sessions/${sessionId}/login`,
+							headers: authHeaders,
+							json: true,
+						});
+						returnData.push({
+							json: {
+								success: true,
+								message: 'Login initiated successfully. Use Get QR Code operation to retrieve the QR code.',
+								sessionId: sessionId,
+								...response,
+							}
+						});
+
+					} else if (operation === 'getQrCode') {
+						// Get QR code for a session (viewable as both raw data and image)
+						const sessionId = this.getNodeParameter('sessionId', i) as string;
+						const response = await this.helpers.request({
+							method: 'GET',
+							url: `${baseUrl}/api/sessions/${sessionId}/qr`,
+							headers: authHeaders,
+							json: true,
+						});
+
+						// Extract QR code from response (handle both old and new response formats)
+						const qrCode = response.data?.qr_code || response.qr_code || response.qrCode;
+
+						// Return QR code in multiple formats for flexibility
+						// - qrCodeRaw: Base64 string without the data URL prefix (for custom processing)
+						// - qrCodeDataUrl: Full data URL (for direct display as image)
+						// - qrCodeImage: Same as qrCodeDataUrl (alias for convenience)
+						returnData.push({
+							json: {
+								success: true,
+								message: 'QR code retrieved successfully',
+								sessionId: sessionId,
+								qrCodeRaw: qrCode?.replace(/^data:image\/png;base64,/, '') || '', // Raw base64 (before image format)
+								qrCodeDataUrl: qrCode || '', // Data URL format (after image format)
+								qrCodeImage: qrCode || '', // Alias for qrCodeDataUrl
+								mimeType: 'image/png',
+								format: 'base64',
+								...response,
+							}
+						});
 					}
 
 				} else if (resource === 'message') {
