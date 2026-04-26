@@ -170,6 +170,12 @@ class WhatsAppMultiSession {
                             action: 'Reply to a message',
                         },
                         {
+                            name: 'Mark as Read',
+                            value: 'markAsRead',
+                            description: 'Mark a message as read (send blue tick)',
+                            action: 'Mark message as read',
+                        },
+                        {
                             name: 'Download Image',
                             value: 'downloadImage',
                             description: 'Download an image from a received message',
@@ -505,6 +511,21 @@ class WhatsAppMultiSession {
                     default: '',
                     placeholder: '3EB0D136B13F32830F7B88',
                     description: 'ID of the message to reply to (from webhook trigger data: {{$json.id}}). Must be from the same session.',
+                },
+                {
+                    displayName: 'Message ID',
+                    name: 'messageId',
+                    type: 'string',
+                    required: true,
+                    displayOptions: {
+                        show: {
+                            resource: ['message'],
+                            operation: ['markAsRead'],
+                        },
+                    },
+                    default: '',
+                    placeholder: '3EB0D136B13F32830F7B88',
+                    description: 'ID of the message to mark as read (from webhook trigger data: {{$json.id}}). Must be from the same session.',
                 },
                 // Download Image fields
                 {
@@ -1223,6 +1244,15 @@ class WhatsAppMultiSession {
                             message: replyText,
                             quoted_message_id: quotedMessageId,
                         }, sessionId, 'Reply message');
+                        returnData.push({ json: result });
+                        returnData.push({ json: result });
+                    }
+                    else if (operation === 'markAsRead') {
+                        const messageId = this.getNodeParameter('messageId', i);
+                        const result = await handleMessageSending(`${baseUrl}/api/sessions/${sessionId}/read`, {
+                            to: phoneNumber,
+                            message_id: messageId,
+                        }, sessionId, 'Read receipt');
                         returnData.push({ json: result });
                     }
                     else if (operation === 'downloadImage') {

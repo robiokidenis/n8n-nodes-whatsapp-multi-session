@@ -177,6 +177,16 @@ export class WhatsAppMultiSession implements INodeType {
 						description: 'Reply to a specific message',
 						action: 'Reply to a message',
 					},
+
+							{
+
+							name: 'Mark as Read',
+							value: 'markAsRead',
+							description: 'Mark a message as read (send blue tick)',
+							action: 'Mark message as read',
+						},
+
+
 					{
 						name: 'Download Image',
 						value: 'downloadImage',
@@ -535,6 +545,22 @@ export class WhatsAppMultiSession implements INodeType {
 				description: 'ID of the message to reply to (from webhook trigger data: {{$json.id}}). Must be from the same session.',
 			},
 
+
+				{
+					displayName: 'Message ID',
+					name: 'messageId',
+					type: 'string',
+					required: true,
+					displayOptions: {
+						show: {
+							resource: ['message'],
+							operation: ['markAsRead'],
+						},
+					},
+					default: '',
+					placeholder: '3EB0D136B13F32830F7B88',
+					description: 'ID of the message to mark as read (from webhook trigger data: {{$json.id}}). Must be from the same session.',
+				},
 			// Download Image fields
 			{
 				displayName: 'Media URL',
@@ -1303,6 +1329,20 @@ export class WhatsAppMultiSession implements INodeType {
 						);
 						returnData.push({ json: result });
 
+					returnData.push({ json: result });
+
+					} else if (operation === 'markAsRead') {
+						const messageId = this.getNodeParameter('messageId', i) as string;
+						const result = await handleMessageSending(
+							`${baseUrl}/api/sessions/${sessionId}/read`,
+							{
+								to: phoneNumber,
+								message_id: messageId,
+							},
+							sessionId,
+							'Read receipt'
+						);
+						returnData.push({ json: result });
 					} else if (operation === 'downloadImage') {
 						const mediaUrl = this.getNodeParameter('mediaUrl', i) as string;
 						const outputFormat = this.getNodeParameter('outputFormat', i, 'base64') as string;
